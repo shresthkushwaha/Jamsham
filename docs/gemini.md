@@ -3,6 +3,8 @@
 ## Project Overview
 A real-time collaborative web platform where users can join a room, be randomly assigned an instrument, and play music together while communicating via low-latency video and audio chat. The platform also supports recording the jam sessions.
 
+**GitHub Repository:** [https://github.com/shresthkushwaha/Jamsham](https://github.com/shresthkushwaha/Jamsham)
+
 ## 1. Proposed Architecture and Tech Stack
 
 ### Core Technologies
