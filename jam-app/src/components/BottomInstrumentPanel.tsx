@@ -83,16 +83,16 @@ export default function BottomInstrumentPanel({
     k: { id: 'D_MAJOR', notes: ['D3', 'A3', 'D4', 'F#4'] },
   };
 
-  // --- DRUMS (Freedrum Concentric Ring Arc) ---
+  // --- DRUMS (Figma Layout + Set Stroke Colors + Green Outer Glow) ---
   const drumPads = [
-    { id: 'CRASH', name: 'Crash Cymbal', key: 'H', color: '#FFD600', icon: '✨', position: { gridColumn: '2 / span 2', gridRow: '1' } },
-    { id: 'TOM 1', name: 'Rack Tom 1', key: 'F', color: '#00E5FF', icon: '🔴', position: { gridColumn: '1', gridRow: '1' } },
-    { id: 'TOM 2', name: 'Rack Tom 2', key: 'G', color: '#00E5FF', icon: '🔵', position: { gridColumn: '4', gridRow: '1' } },
-    { id: 'HIHAT', name: 'Closed Hi-Hat', key: 'D', color: '#00E676', icon: '💥', position: { gridColumn: '1', gridRow: '2' } },
-    { id: 'COWBELL', name: 'Cowbell', key: 'K', color: '#E040FB', icon: '🔔', position: { gridColumn: '4', gridRow: '2' } },
-    { id: 'CLAP', name: 'Hand Clap', key: 'J', color: '#FFAB00', icon: '👏', position: { gridColumn: '1 / span 1', gridRow: '3' } },
-    { id: 'KICK', name: 'Kick Drum', key: 'A', color: '#FF2D55', icon: '🥁', position: { gridColumn: '2', gridRow: '2 / span 2' } },
-    { id: 'SNARE', name: 'Snare', key: 'S', color: '#FF6D00', icon: '🪘', position: { gridColumn: '3', gridRow: '2 / span 2' } },
+    { id: 'KICK', name: 'Kick', key: 'A', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'kick' },
+    { id: 'SNARE', name: 'Snare', key: 'S', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'snare' },
+    { id: 'HIHAT', name: 'Hi-Hat', key: 'D', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'hihat' },
+    { id: 'TOM 1', name: 'Tom 1', key: 'F', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'tom' },
+    { id: 'TOM 2', name: 'Tom 2', key: 'G', strokeColor: '#FFFFFF', setGroup: 'CYMBALS', icon: 'tom' },
+    { id: 'CRASH', name: 'Crash', key: 'H', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'crash' },
+    { id: 'CLAP', name: 'Clap', key: 'J', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'clap' },
+    { id: 'COWBELL', name: 'Cowbell', key: 'K', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'cowbell' },
   ];
 
   const drumKeyMap: Record<string, string> = {
@@ -166,10 +166,10 @@ export default function BottomInstrumentPanel({
     <div style={panelWrapperStyle}>
       {/* Instrument Surface Area */}
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {instrumentId === 'DRUM' ? (
-          // FREEDRUM INSTANCE
-          <div style={freedrumWrapper}>
-            <div style={freedrumArcGrid}>
+        {instrumentId?.toUpperCase() === 'DRUMS' || instrumentId?.toUpperCase() === 'DRUM' ? (
+          // FIGMA DRUM ROW INSTANCE (Image 1, 2 & 3 Recreation)
+          <div style={figmaDrumWrapper}>
+            <div style={figmaDrumRow}>
               {drumPads.map((pad) => {
                 const isActive = displayNotes.includes(pad.id);
                 return (
@@ -179,18 +179,17 @@ export default function BottomInstrumentPanel({
                     onMouseUp={() => triggerNoteOff(pad.id)}
                     onMouseLeave={() => triggerNoteOff(pad.id)}
                     style={{
-                      ...freedrumPadStyle,
-                      ...pad.position,
-                      borderColor: isActive ? pad.color : 'rgba(255, 255, 255, 0.2)',
-                      background: isActive ? `${pad.color}33` : '#161622',
-                      boxShadow: isActive ? `0 0 20px ${pad.color}` : 'none',
-                      transform: isActive ? 'scale(0.94)' : 'none',
+                      ...figmaDrumBtnStyle,
+                      border: isActive ? '5px solid #55FF66' : `3px solid ${pad.strokeColor}`,
+                      boxShadow: isActive
+                        ? '0 0 24px #55FF66, 0 0 45px rgba(85,255,102,0.65)'
+                        : '0 4px 12px rgba(0,0,0,0.4)',
+                      transform: isActive ? 'scale(0.93)' : 'scale(1)',
                     }}
                   >
-                    <div style={{ ...innerRingStyle, borderColor: pad.color }}>
-                      <span style={{ fontSize: '14px' }}>{pad.icon}</span>
-                      <span style={padKeyBadgeStyle}>{pad.key}</span>
-                      <span style={{ fontSize: '9px', fontWeight: 700, color: '#ccc', marginTop: '2px' }}>{pad.name}</span>
+                    <div style={figmaInnerCapStyle}>
+                      {renderDrumIcon(pad.icon)}
+                      <span style={figmaKeyBadgeStyle}>{pad.key}</span>
                     </div>
                   </button>
                 );
@@ -579,44 +578,81 @@ const clickLedStyle: React.CSSProperties = {
   border: '1px solid rgba(255, 82, 82, 0.3)',
 };
 
-const freedrumArcGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gridTemplateRows: 'repeat(3, 1fr)',
-  gap: '8px',
-  flex: 1,
+const renderDrumIcon = (icon: string) => {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      {icon === 'snare' || icon === 'tom' ? (
+        <>
+          <rect x="4" y="8" width="16" height="8" rx="2" />
+          <line x1="4" y1="12" x2="20" y2="12" strokeDasharray="2 2" />
+        </>
+      ) : icon === 'hihat' || icon === 'crash' ? (
+        <>
+          <ellipse cx="12" cy="9.5" rx="7.5" ry="2.5" />
+          <line x1="12" y1="12" x2="12" y2="18" />
+        </>
+      ) : icon === 'kick' ? (
+        <>
+          <circle cx="12" cy="11" r="6" />
+          <path d="M8 17l-2 3M16 17l2 3" />
+        </>
+      ) : (
+        <circle cx="12" cy="12" r="5" />
+      )}
+    </svg>
+  );
 };
 
-const freedrumPadStyle: React.CSSProperties = {
-  borderRadius: '50%',
-  border: '2px solid',
-  cursor: 'pointer',
+/* --- FIGMA DRUM STYLES (Image 1, 2 & 3) --- */
+const figmaDrumWrapper: React.CSSProperties = {
+  display: 'flex',
+  width: '100%',
+  height: '100%',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  userSelect: 'none',
+};
+
+const figmaDrumRow: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  outline: 'none',
-  transition: 'all 0.08s ease',
-  padding: 0,
+  gap: '14px',
+  width: '100%',
+  height: '100%',
 };
 
-const innerRingStyle: React.CSSProperties = {
+const figmaDrumBtnStyle: React.CSSProperties = {
+  width: '58px',
+  height: '58px',
+  borderRadius: '50%',
+  background: '#14151B',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  outline: 'none',
+  padding: 0,
+  transition: 'all 0.08s cubic-bezier(0.2, 0.8, 0.4, 1)',
+};
+
+const figmaInnerCapStyle: React.CSSProperties = {
   width: '82%',
   height: '82%',
   borderRadius: '50%',
-  border: '1px dashed',
+  background: 'radial-gradient(circle at 35% 35%, #2B2E38, #181920)',
+  border: '2px solid #0D0E12',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
+  boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.6)',
 };
 
-const padKeyBadgeStyle: React.CSSProperties = {
-  fontSize: '10px',
-  fontWeight: '900',
-  color: '#fff',
-  background: 'rgba(0, 0, 0, 0.6)',
-  padding: '1px 6px',
-  borderRadius: '8px',
-  border: '1px solid rgba(255, 255, 255, 0.2)',
-  marginTop: '2px',
+const figmaKeyBadgeStyle: React.CSSProperties = {
+  fontSize: '8px',
+  fontWeight: '800',
+  color: '#AAA',
+  marginTop: '1px',
 };
