@@ -293,8 +293,14 @@ export class WebRTCManager {
     };
 
     pc.ontrack = (event) => {
-      const stream = event.streams[0] || new MediaStream([event.track]);
-      this.remoteStreams.set(peerSocketId, stream);
+      let stream = this.remoteStreams.get(peerSocketId);
+      if (!stream) {
+        stream = event.streams[0] || new MediaStream();
+        this.remoteStreams.set(peerSocketId, stream);
+      }
+      if (event.track && !stream.getTracks().some((t) => t.id === event.track.id)) {
+        stream.addTrack(event.track);
+      }
       this.attachAudioAnalyser(peerSocketId, stream);
       this.onRemoteStream?.(peerSocketId, stream);
     };

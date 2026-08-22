@@ -55,12 +55,13 @@ export default function PlayerOrb({
   defaultSize,
 }: PlayerOrbProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const instKey = (user.instrument?.id || user.instrument?.name || 'PIANO').toUpperCase();
   const baseColor = roleColor || INSTRUMENT_COLORS[instKey] || user.instrument?.color || '#9C27B0';
   const iconEmoji = INSTRUMENT_ICONS[instKey] || '🎵';
 
-  // Dynamic Sizing driven by physics engine or note density
+  // Dynamic Sizing driven by note density & voice volume
   const { energy, isHittingNote } = useParticipantEnergy(activeNotes, {
     minSize: defaultSize ? defaultSize * 0.8 : 150,
     maxSize: defaultSize ? defaultSize * 1.3 : 340,
@@ -70,10 +71,20 @@ export default function PlayerOrb({
   const displaySize = defaultSize ? Math.round(defaultSize) : 220;
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    if (stream) {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+      // Guarantee remote microphone audio plays out of speakers
+      if (audioRef.current && !isLocal) {
+        audioRef.current.srcObject = stream;
+        audioRef.current.play().catch((err) => {
+          console.warn('[PlayerOrb] Audio play error:', err);
+        });
+      }
     }
-  }, [stream]);
+  }, [stream, isLocal]);
 
   const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled && !user.isVideoOff;
   const isSpeaking = volume > 8;
@@ -96,6 +107,9 @@ export default function PlayerOrb({
         justifyContent: 'center',
       }}
     >
+      {/* Dedicated Unmuted Audio Player for Remote Peer Microphone Voice */}
+      {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
+
       {/* Concentric Speaking Soundwave Aura */}
       {isSpeaking && (
         <div
@@ -148,20 +162,22 @@ export default function PlayerOrb({
           zIndex: 1,
         }}
       >
-        {hasVideo ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isLocal}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transform: isLocal ? 'scaleX(-1)' : 'none',
-            }}
-          />
-        ) : (
+        {/* Permanent Video Element in DOM to prevent track drops */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={isLocal}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: isLocal ? 'scaleX(-1)' : 'none',
+            display: hasVideo ? 'block' : 'none',
+          }}
+        />
+
+        {!hasVideo && (
           <div
             style={{
               display: 'flex',
@@ -178,43 +194,21 @@ export default function PlayerOrb({
                 width: `${Math.max(48, displaySize * 0.38)}px`,
                 height: `${Math.max(48, displaySize * 0.38)}px`,
                 borderRadius: '50%',
-                background: `linear-gradient(135deg, ${baseColor} 0%, #111 100%)`,
+                backgroundColor: `${baseColor}33`,
+                border: `2px solid ${baseColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                border: '2px solid rgba(255,255,255,0.2)',
+                fontSize: `${Math.max(18, displaySize * 0.16)}px`,
+                fontWeight: 'bold',
+                color: '#ffffff',
+                marginBottom: '4px',
               }}
             >
-              <span style={{ fontSize: `${Math.max(16, displaySize * 0.14)}px`, fontWeight: 'bold', color: '#fff' }}>
-                {user.userName ? user.userName.slice(0, 2).toUpperCase() : 'ME'}
-              </span>
+              {user.userName ? user.userName.slice(0, 2).toUpperCase() : 'JM'}
             </div>
-            <span
-              style={{
-                fontSize: `${Math.max(10, displaySize * 0.045)}px`,
-                color: 'rgba(255,255,255,0.7)',
-                marginTop: '6px',
-                fontWeight: 500,
-              }}
-            >
-              {user.userName} {isLocal ? '(You)' : ''}
-            </span>
+            <span style={{ fontSize: '11px', color: '#888' }}>Camera Off</span>
           </div>
-        )}
-
-        {/* Note Hit Ripple Overlay */}
-        {isHittingNote && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              borderRadius: '50%',
-              background: `radial-gradient(circle, ${baseColor}44 0%, transparent 70%)`,
-              animation: 'pulse 0.3s ease-out',
-              pointerEvents: 'none',
-            }}
-          />
         )}
       </div>
 
@@ -224,51 +218,54 @@ export default function PlayerOrb({
           position: 'absolute',
           bottom: '2px',
           right: '2px',
-          width: `${Math.max(34, displaySize * 0.23)}px`,
-          height: `${Math.max(34, displaySize * 0.23)}px`,
+          width: `${Math.max(34, displaySize * 0.22)}px`,
+          height: `${Math.max(34, displaySize * 0.22)}px`,
           borderRadius: '50%',
           backgroundColor: '#000000',
-          border: '2px solid #ffffff',
+          border: `2px solid #ffffff`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.7)',
-          transform: isHittingNote ? 'scale(1.25)' : 'scale(1)',
-          transition: 'transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          zIndex: 4,
+          fontSize: `${Math.max(16, displaySize * 0.12)}px`,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.8)',
+          zIndex: 3,
         }}
-        title={`${user.instrument?.name || 'Instrument'} (${user.userName})`}
+        title={`${user.instrument?.name || 'Instrument'} (${user.instrument?.role || 'Band Member'})`}
       >
-        <span style={{ fontSize: `${Math.max(16, displaySize * 0.11)}px`, lineHeight: 1 }}>
-          {iconEmoji}
-        </span>
+        {iconEmoji}
       </div>
 
-      {/* Floating Admin / Host Crown Badge (Top Center) */}
-      {user.isAdmin && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '-8px',
-            borderRadius: '12px',
-            backgroundColor: '#FFD700',
-            color: '#000',
-            fontWeight: 800,
-            fontSize: `${Math.max(10, displaySize * 0.045)}px`,
-            padding: '2px 8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '3px',
-            boxShadow: '0 2px 10px rgba(255, 215, 0, 0.6)',
-            zIndex: 6,
-            letterSpacing: '0.5px',
-          }}
-          title="Session Admin / Host"
-        >
-          <span>👑</span>
-          <span>HOST</span>
-        </div>
-      )}
+      {/* Floating Name & Host Crown Tag */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: `${Math.round(displaySize * 0.08)}px`,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          padding: '3px 10px',
+          borderRadius: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '11px',
+          fontWeight: 600,
+          color: '#ffffff',
+          letterSpacing: '0.2px',
+          whiteSpace: 'nowrap',
+          zIndex: 3,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+        }}
+      >
+        <span>{user.userName}</span>
+        {user.isAdmin && (
+          <span style={{ color: '#FFD700', fontSize: '10px' }} title="Session Host">
+            👑
+          </span>
+        )}
+      </div>
     </div>
   );
 }
