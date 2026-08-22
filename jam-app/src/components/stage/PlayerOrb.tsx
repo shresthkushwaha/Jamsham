@@ -27,6 +27,8 @@ const INSTRUMENT_ICONS: Record<string, string> = {
   TRUMPET: '🎺',
   SAXOPHONE: '🎷',
   SAX: '🎷',
+  VIOLIN: '🎻',
+  STRINGS: '🎻',
   PIANO: '🎹',
 };
 
@@ -40,6 +42,8 @@ const INSTRUMENT_COLORS: Record<string, string> = {
   TRUMPET: '#FFD600',
   SAXOPHONE: '#AB47BC',
   SAX: '#AB47BC',
+  VIOLIN: '#29B6F6',
+  STRINGS: '#29B6F6',
   PIANO: '#00E676',
 };
 

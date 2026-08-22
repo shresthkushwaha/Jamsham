@@ -16,6 +16,7 @@ const INSTRUMENT_SHOWCASE = [
   { name: 'Bansuri Flute', color: '#00B0FF', icon: '🪈' },
   { name: 'Brass Trumpet', color: '#FFD600', icon: '🎺' },
   { name: 'Saxophone', color: '#AB47BC', icon: '🎷' },
+  { name: 'Acoustic Violin', color: '#29B6F6', icon: '🎻' },
 ];
 
 function generateUniqueSessionKey(): string {

@@ -48,6 +48,9 @@ class AudioEngine {
   // 7. SAXOPHONE (Soulful Reed Lead)
   private saxSynth: Tone.PolySynth | null = null;
 
+  // 8. VIOLIN (Classical Bowed Acoustic Violin & Strings)
+  private violinSynth: Tone.PolySynth | null = null;
+
   public async init() {
     if (this.isInitialized) return;
 
@@ -232,8 +235,17 @@ class AudioEngine {
     this.saxSynth.connect(this.effectsReverb);
     this.saxSynth.connect(this.masterGain);
 
+    // ── 8. VIOLIN (Classical Bowed Acoustic Violin & Strings) ──────────────────
+    this.violinSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'sawtooth6' },
+      envelope: { attack: 0.18, decay: 0.35, sustain: 0.9, release: 1.4 },
+    });
+    this.violinSynth.connect(this.effectsChorus);
+    this.violinSynth.connect(this.effectsReverb);
+    this.violinSynth.connect(this.masterGain);
+
     this.isInitialized = true;
-    console.log('[AudioEngine] 7 Studio Instruments (Guitar, Keyboard, Drum, Sitar, Flute, Trumpet, Saxophone) initialized.');
+    console.log('[AudioEngine] 8 Studio Instruments (Guitar, Keyboard, Drum, Sitar, Flute, Trumpet, Saxophone, Violin) initialized.');
   }
 
   public async resume() {
@@ -323,6 +335,14 @@ class AudioEngine {
           }
           break;
 
+        // ── 8. VIOLIN & STRINGS ────────────────────────────────────────────
+        case 'VIOLIN':
+        case 'STRINGS':
+          if (this.violinSynth) {
+            this.violinSynth.triggerAttackRelease(noteOrType, duration, now, vel);
+          }
+          break;
+
         default:
           if (this.pianoSampler && this.pianoSampler.loaded) {
             this.pianoSampler.triggerAttackRelease(noteOrType, duration, now, vel);
@@ -400,6 +420,8 @@ class AudioEngine {
         this.trumpetSynth.triggerRelease(note);
       } else if ((id === 'SAXOPHONE' || id === 'SAX') && this.saxSynth) {
         this.saxSynth.triggerRelease(note);
+      } else if ((id === 'VIOLIN' || id === 'STRINGS') && this.violinSynth) {
+        this.violinSynth.triggerRelease(note);
       } else if (id === 'FLUTE' && this.fluteSynth) {
         this.fluteSynth.triggerRelease(note);
       } else if (id === 'SITAR' && this.sitarSynth) {

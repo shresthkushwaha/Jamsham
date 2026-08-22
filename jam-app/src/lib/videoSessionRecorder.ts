@@ -20,6 +20,8 @@ const INSTRUMENT_EMOJIS: Record<string, string> = {
   TRUMPET: '🎺',
   SAXOPHONE: '🎷',
   SAX: '🎷',
+  VIOLIN: '🎻',
+  STRINGS: '🎻',
   PIANO: '🎹',
 };
 

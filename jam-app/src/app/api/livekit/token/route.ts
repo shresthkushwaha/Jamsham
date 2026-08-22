@@ -13,6 +13,7 @@ const INSTRUMENT_POOL = [
   { id: 'FLUTE', name: 'Flute', color: '#00B0FF', role: 'Air & Woodwind Solos', icon: '🪈' },
   { id: 'TRUMPET', name: 'Trumpet', color: '#FFD600', role: 'Bright Brass & Horn Stabs', icon: '🎺' },
   { id: 'SAXOPHONE', name: 'Saxophone', color: '#AB47BC', role: 'Soulful Leads & Stabs', icon: '🎷' },
+  { id: 'VIOLIN', name: 'Violin', color: '#29B6F6', role: 'Classical & Cinematic Melodies', icon: '🎻' },
 ];
 
 export async function POST(req: NextRequest) {
