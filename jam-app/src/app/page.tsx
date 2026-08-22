@@ -28,7 +28,7 @@ export default function JamRoomPage() {
   const webrtcRef = useRef<WebRTCManager | null>(null);
 
   // Join Room
-  const handleJoin = async (targetRoomId: string, userName: string) => {
+  const handleJoin = async (targetRoomId: string, userName: string, preferredInstrumentId?: string) => {
     setIsLoading(true);
     try {
       // 1. Initialize Tone.js audio engine with Soundfonts
@@ -94,7 +94,7 @@ export default function JamRoomPage() {
         setVolumeLevels(levels);
       };
 
-      const result = await manager.connectAndJoin(targetRoomId, userName);
+      const result = await manager.connectAndJoin(targetRoomId, userName, preferredInstrumentId);
       setLocalUser(result.user);
       setUsers(result.users);
       setBpm(result.bpm);

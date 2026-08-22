@@ -81,6 +81,7 @@ export class WebRTCManager {
   public async connectAndJoin(
     roomId: string,
     userName: string,
+    preferredInstrumentId?: string,
     serverUrl?: string
   ): Promise<{ user: User; users: User[]; bpm: number }> {
     this.roomId = roomId;
@@ -117,7 +118,7 @@ export class WebRTCManager {
     // If no backend URL configured on production, enter resilient Solo/Creator mode
     if (!backendUrl) {
       console.info('[WebRTC] No external backend URL configured. Entering standalone Jam Stage.');
-      return this.enterStandaloneMode(roomId, userName);
+      return this.enterStandaloneMode(roomId, userName, preferredInstrumentId);
     }
 
     return new Promise((resolve) => {
@@ -128,7 +129,7 @@ export class WebRTCManager {
         if (!hasResolved) {
           hasResolved = true;
           console.warn('[WebRTC] Backend connection timed out. Launching standalone Jam Stage.');
-          resolve(this.enterStandaloneMode(roomId, userName));
+          resolve(this.enterStandaloneMode(roomId, userName, preferredInstrumentId));
         }
       }, 3500);
 
@@ -146,11 +147,11 @@ export class WebRTCManager {
           if (!hasResolved) {
             hasResolved = true;
             clearTimeout(timeoutId);
-            resolve(this.enterStandaloneMode(roomId, userName));
+            resolve(this.enterStandaloneMode(roomId, userName, preferredInstrumentId));
           }
         });
 
-        this.socket.emit('join_room', { roomId, userName }, (res: any) => {
+        this.socket.emit('join_room', { roomId, userName, preferredInstrumentId }, (res: any) => {
           if (!hasResolved) {
             hasResolved = true;
             clearTimeout(timeoutId);
@@ -170,7 +171,7 @@ export class WebRTCManager {
                 bpm: res.room.bpm,
               });
             } else {
-              resolve(this.enterStandaloneMode(roomId, userName));
+              resolve(this.enterStandaloneMode(roomId, userName, preferredInstrumentId));
             }
           }
         });
@@ -178,20 +179,24 @@ export class WebRTCManager {
         if (!hasResolved) {
           hasResolved = true;
           clearTimeout(timeoutId);
-          resolve(this.enterStandaloneMode(roomId, userName));
+          resolve(this.enterStandaloneMode(roomId, userName, preferredInstrumentId));
         }
       }
     });
   }
 
   // Standalone mode fallback when external backend is offline
-  private enterStandaloneMode(roomId: string, userName: string): { user: User; users: User[]; bpm: number } {
+  private enterStandaloneMode(roomId: string, userName: string, preferredInstrumentId?: string): { user: User; users: User[]; bpm: number } {
     this.isSoloMode = true;
-    const randomInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
+    let chosenInst = INSTRUMENT_POOL.find((i) => i.id.toUpperCase() === (preferredInstrumentId || '').toUpperCase());
+    if (!chosenInst) {
+      chosenInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
+    }
+
     const mockUser: User = {
       socketId: `solo-${Math.random().toString(36).substring(2, 9)}`,
       userName: userName || 'Host',
-      instrument: randomInst,
+      instrument: chosenInst,
       isAdmin: true,
       isMuted: false,
       isVideoOff: false,

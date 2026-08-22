@@ -40,7 +40,14 @@ function getOrCreateRoom(roomId, creatorSocketId) {
   return rooms.get(roomId);
 }
 
-function assignInstrument(room) {
+function assignInstrument(room, preferredInstrumentId) {
+  if (preferredInstrumentId && preferredInstrumentId !== 'AUTO') {
+    const match = ALL_INSTRUMENTS.find(
+      (inst) => inst.id.toUpperCase() === preferredInstrumentId.toUpperCase()
+    );
+    if (match) return match;
+  }
+
   const assigned = new Set(Object.values(room.users).map((u) => u.instrument?.id));
   const available = ALL_INSTRUMENTS.filter((inst) => !assigned.has(inst.id));
 
@@ -59,14 +66,14 @@ io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
   let currentRoomId = null;
 
-  socket.on('join_room', ({ roomId, userName }, callback) => {
+  socket.on('join_room', ({ roomId, userName, preferredInstrumentId }, callback) => {
     const cleanRoomId = (roomId || 'main-stage').trim().toLowerCase();
     currentRoomId = cleanRoomId;
     socket.join(cleanRoomId);
 
     const isFirstInRoom = !rooms.has(cleanRoomId) || Object.keys(rooms.get(cleanRoomId).users).length === 0;
     const room = getOrCreateRoom(cleanRoomId, socket.id);
-    const instrument = assignInstrument(room);
+    const instrument = assignInstrument(room, preferredInstrumentId);
 
     // The person who creates / is first in the session becomes the Admin (Host)
     const isAdmin = room.adminSocketId === socket.id || isFirstInRoom;

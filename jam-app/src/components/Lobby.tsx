@@ -3,18 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { Radio, PlusCircle, LogIn, ArrowRight, Dices, ShieldCheck } from 'lucide-react';
 
 interface LobbyProps {
-  onJoin: (roomId: string, userName: string) => void;
+  onJoin: (roomId: string, userName: string, preferredInstrumentId?: string) => void;
   isLoading?: boolean;
   defaultRoomId?: string;
 }
 
-const INSTRUMENT_SHOWCASE = [
-  { name: 'Acoustic Drums', role: 'Rhythm & Beats', color: '#FF5722', icon: '🥁' },
-  { name: 'Acoustic / Electric Guitar', role: 'Chords & Riffs', color: '#FF9800', icon: '🎸' },
-  { name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB', icon: '🎸' },
-  { name: 'Grand Piano', role: 'Melody & Harmony', color: '#00E676', icon: '🎹' },
-  { name: 'Saxophone & Horns', role: 'Soulful Leads', color: '#FFD600', icon: '🎷' },
-  { name: 'String Section', role: 'Violin & Cello Swells', color: '#00B0FF', icon: '🎻' },
+const INSTRUMENT_OPTIONS = [
+  { id: 'DRUMS', name: 'Acoustic Drums', role: 'Rhythm & Beats', color: '#FF5722', icon: '🥁' },
+  { id: 'GUITAR', name: 'Guitar & Chords', role: 'Chords & Riffs', color: '#FF9800', icon: '🎸' },
+  { id: 'PIANO', name: 'Grand Piano', role: 'Melody & Harmony', color: '#00E676', icon: '🎹' },
+  { id: 'BASS', name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB', icon: '🎸' },
+  { id: 'SAX', name: 'Saxophone & Horns', role: 'Soulful Leads', color: '#FFD600', icon: '🎷' },
+  { id: 'STRINGS', name: 'String Section', role: 'Violin & Cello Swells', color: '#00B0FF', icon: '🎻' },
+  { id: 'AUTO', name: 'Auto-Assign', role: 'Random Assignment', color: '#9E9E9E', icon: '🎲' },
 ];
 
 function generateUniqueSessionKey(): string {
@@ -31,6 +32,7 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
   const [userName, setUserName] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
+  const [selectedInstrument, setSelectedInstrument] = useState<string>('DRUMS');
 
   // Check URL query parameters for invite link and generate client-safe unique key
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
     e.preventDefault();
     const finalRoomId = mode === 'create' ? createdRoomId.trim() : joinRoomId.trim();
     if (!finalRoomId) return;
-    onJoin(finalRoomId, userName.trim() || (mode === 'create' ? 'Host' : 'Musician'));
+    onJoin(finalRoomId, userName.trim() || (mode === 'create' ? 'Host' : 'Musician'), selectedInstrument);
   };
 
   return (
@@ -151,26 +153,37 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
             </div>
           )}
 
-          {/* Instrument Pool Preview */}
+          {/* Interactive Instrument Selection Control */}
           <div style={instrumentPoolContainer}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: 600 }}>
-              BAND ROLES (AUTO-ASSIGNED ON JOIN):
+            <div style={{ fontSize: '11px', color: '#AAA', marginBottom: '8px', fontWeight: 700, letterSpacing: '0.5px' }}>
+              SELECT YOUR INSTRUMENT ROLE:
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {INSTRUMENT_SHOWCASE.map((inst) => (
-                <div
-                  key={inst.name}
-                  style={{
-                    ...instPill,
-                    borderColor: `${inst.color}44`,
-                    background: `${inst.color}11`,
-                    color: inst.color,
-                  }}
-                >
-                  <span style={{ marginRight: '4px' }}>{inst.icon}</span>
-                  <span>{inst.name}</span>
-                </div>
-              ))}
+              {INSTRUMENT_OPTIONS.map((inst) => {
+                const isSelected = selectedInstrument === inst.id;
+                return (
+                  <button
+                    key={inst.id}
+                    type="button"
+                    onClick={() => setSelectedInstrument(inst.id)}
+                    style={{
+                      ...instPill,
+                      cursor: 'pointer',
+                      border: isSelected ? `2px solid ${inst.color}` : '1px solid rgba(255, 255, 255, 0.12)',
+                      background: isSelected ? `${inst.color}25` : 'rgba(255, 255, 255, 0.03)',
+                      color: isSelected ? '#FFFFFF' : '#AAAAAA',
+                      boxShadow: isSelected ? `0 0 14px ${inst.color}55` : 'none',
+                      transform: isSelected ? 'scale(1.03)' : 'scale(1)',
+                      transition: 'all 0.15s ease',
+                      outline: 'none',
+                    }}
+                  >
+                    <span style={{ marginRight: '5px' }}>{inst.icon}</span>
+                    <span style={{ fontWeight: isSelected ? 800 : 500 }}>{inst.name}</span>
+                    {isSelected && <span style={{ marginLeft: '4px', fontSize: '10px', color: inst.color }}>✓</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
