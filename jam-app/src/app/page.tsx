@@ -24,8 +24,14 @@ export default function JamRoomPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
 
   const webrtcRef = useRef<WebRTCManager | null>(null);
+
+  const handleUnlockAudio = async () => {
+    await audioEngine.resume();
+    setAudioUnlocked(true);
+  };
 
   const handleJoin = async (targetRoomId: string, userName: string) => {
     setIsLoading(true);
@@ -206,7 +212,26 @@ export default function JamRoomPage() {
   }
 
   return (
-    <div style={pureMainFrameStyle}>
+    <div style={pureMainFrameStyle} onClick={!audioUnlocked ? handleUnlockAudio : undefined}>
+      {/* Audio Unlock Overlay — browsers block audio until a user gesture */}
+      {!audioUnlocked && (
+        <div
+          onClick={handleUnlockAudio}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}
+        >
+          <div style={{ fontSize: '52px', marginBottom: '16px' }}>🔊</div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>Tap to Enable Audio</div>
+          <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', maxWidth: '280px' }}>
+            Browsers require a tap before playing audio.<br />Tap anywhere to enter the stage with full sound.
+          </div>
+        </div>
+      )}
+
       {/* 1. Minimalist Header */}
       <MinimalHeader
         roomId={roomId}
@@ -223,7 +248,7 @@ export default function JamRoomPage() {
         onLeave={handleLeave}
       />
 
-      {/* 2. Physics Bubble Stage — fills the entire remaining viewport */}
+      {/* 2. Physics Bubble Stage */}
       <BubbleStage
         users={users.length > 0 ? users : localUser ? [localUser] : []}
         localUser={localUser}
