@@ -5,6 +5,7 @@ const cors = require('cors');
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 
@@ -13,7 +14,19 @@ const io = new Server(server, {
     origin: '*',
     methods: ['GET', 'POST'],
   },
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
+
+// Health check endpoint — keeps Render alive and confirms server is running
+app.get('/', (req, res) => {
+  const roomCount = rooms.size;
+  const userCount = [...rooms.values()].reduce((sum, r) => sum + Object.keys(r.users).length, 0);
+  res.json({ status: 'ok', service: 'Jamsham Jam Server', rooms: roomCount, users: userCount });
+});
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+
 
 const ALL_INSTRUMENTS = [
   { id: 'DRUM', name: 'Drum Kit', color: '#FF5722', role: 'Rhythm & Beats' },
