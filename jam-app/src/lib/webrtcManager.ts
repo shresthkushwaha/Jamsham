@@ -35,11 +35,13 @@ export interface ChatMessage {
 
 const INSTRUMENT_POOL = [
   { id: 'DRUMS', name: 'Acoustic Drums', role: 'Rhythm & Beats', color: '#FF5722' },
-  { id: 'GUITAR', name: 'Acoustic / Electric Guitar', role: 'Chords & Riffs', color: '#FF9800' },
   { id: 'BASS', name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB' },
   { id: 'PIANO', name: 'Grand Piano', role: 'Melody & Harmony', color: '#00E676' },
+  { id: 'GUITAR', name: 'Electric / Acoustic Guitar', role: 'Chords & Riffs', color: '#FF9800' },
   { id: 'SAX', name: 'Saxophone & Horns', role: 'Soulful Leads', color: '#FFD600' },
   { id: 'STRINGS', name: 'String Section', role: 'Violin & Cello Swells', color: '#00B0FF' },
+  { id: 'PAD', name: 'Ambient Synth Pad', role: 'Atmospheric Chords', color: '#26A69A' },
+  { id: 'LEAD', name: 'Synth Lead & Keys', role: 'Electronic Melodies', color: '#AB47BC' },
 ];
 
 const ICE_SERVERS: RTCConfiguration = {
@@ -116,7 +118,6 @@ export class WebRTCManager {
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         backendUrl = 'http://localhost:3001';
       } else {
-        // Built-in default production server on Render
         backendUrl = 'https://jamsham.onrender.com';
       }
     }
@@ -129,7 +130,6 @@ export class WebRTCManager {
     return new Promise((resolve) => {
       let hasResolved = false;
 
-      // Timeout fallback after 6s (give Render time to wake up)
       const timeoutId = setTimeout(() => {
         if (!hasResolved) {
           hasResolved = true;
@@ -149,7 +149,7 @@ export class WebRTCManager {
 
         this.setupSocketListeners();
 
-        // Keep-alive heartbeat every 15s to prevent cloud proxy disconnects
+        // Keep-alive heartbeat
         if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = setInterval(() => {
           if (this.socket?.connected) {
@@ -174,6 +174,15 @@ export class WebRTCManager {
                   this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
                 }
                 this.startVolumeMonitoring();
+
+                // Multi-User Mesh: Connect with every existing peer in the room
+                const existingPeers: User[] = res.room.users || [];
+                existingPeers.forEach((peer) => {
+                  if (peer.socketId !== res.user.socketId) {
+                    // Create peer connection immediately
+                    this.createPeerConnection(peer.socketId);
+                  }
+                });
 
                 resolve({
                   user: res.user,
@@ -226,7 +235,6 @@ export class WebRTCManager {
   private setupSocketListeners() {
     if (!this.socket) return;
 
-    // Auto rejoin on reconnect
     this.socket.on('reconnect', () => {
       console.log('[WebRTC] Reconnected to server, re-joining room:', this.roomId);
       this.socket?.emit('join_room', { roomId: this.roomId, userName: this.currentUserName });
@@ -234,7 +242,10 @@ export class WebRTCManager {
 
     this.socket.on('user_joined', async ({ user, allUsers }: { user: User; allUsers: User[] }) => {
       this.onUserJoined?.(user, allUsers);
-      await this.createOfferForPeer(user.socketId);
+      // Existing peers initiate offer to the new joiner
+      if (user.socketId !== this.localUser?.socketId) {
+        await this.createOfferForPeer(user.socketId);
+      }
     });
 
     this.socket.on('user_left', ({ socketId, remainingUsers }: { socketId: string; remainingUsers: User[] }) => {
@@ -274,6 +285,11 @@ export class WebRTCManager {
   }
 
   private createPeerConnection(peerSocketId: string): RTCPeerConnection {
+    const existing = this.peerConnections.get(peerSocketId);
+    if (existing && existing.connectionState !== 'closed') {
+      return existing;
+    }
+
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
     if (this.localStream) {
@@ -305,7 +321,6 @@ export class WebRTCManager {
       this.onRemoteStream?.(peerSocketId, stream);
     };
 
-    // Auto-restart ICE on connection failure
     pc.oniceconnectionstatechange = () => {
       if (pc.iceConnectionState === 'failed') {
         console.warn('[WebRTC] ICE failed for peer', peerSocketId, 'restarting ICE...');
@@ -318,7 +333,7 @@ export class WebRTCManager {
   }
 
   private async createOfferForPeer(peerSocketId: string, iceRestart = false) {
-    const pc = this.peerConnections.get(peerSocketId) || this.createPeerConnection(peerSocketId);
+    const pc = this.createPeerConnection(peerSocketId);
     try {
       const offer = await pc.createOffer({ iceRestart });
       await pc.setLocalDescription(offer);
@@ -334,18 +349,18 @@ export class WebRTCManager {
   }
 
   private async handleOffer(peerSocketId: string, offer: RTCSessionDescriptionInit) {
-    let pc = this.peerConnections.get(peerSocketId);
-    if (!pc) {
-      pc = this.createPeerConnection(peerSocketId);
-    }
+    const pc = this.createPeerConnection(peerSocketId);
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      
-      // Flush buffered ICE candidates
+
       const queued = this.candidateQueue.get(peerSocketId) || [];
       for (const cand of queued) {
-        await pc.addIceCandidate(new RTCIceCandidate(cand));
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (e) {
+          console.warn('[WebRTC] Flush candidate error:', e);
+        }
       }
       this.candidateQueue.delete(peerSocketId);
 
@@ -368,10 +383,13 @@ export class WebRTCManager {
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
-        // Flush buffered ICE candidates
         const queued = this.candidateQueue.get(peerSocketId) || [];
         for (const cand of queued) {
-          await pc.addIceCandidate(new RTCIceCandidate(cand));
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(cand));
+          } catch (e) {
+            console.warn('[WebRTC] Flush candidate error:', e);
+          }
         }
         this.candidateQueue.delete(peerSocketId);
       } catch (e) {
@@ -389,7 +407,6 @@ export class WebRTCManager {
         console.error('[WebRTC] Add ICE candidate error:', e);
       }
     } else {
-      // Buffer candidate until remote description is set
       const queued = this.candidateQueue.get(peerSocketId) || [];
       queued.push(candidate);
       this.candidateQueue.set(peerSocketId, queued);
