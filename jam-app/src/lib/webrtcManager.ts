@@ -59,13 +59,16 @@ export class WebRTCManager {
   private localStream: MediaStream | null = null;
   private peerConnections: Map<string, RTCPeerConnection> = new Map();
   private remoteStreams: Map<string, MediaStream> = new Map();
+  private candidateQueue: Map<string, RTCIceCandidateInit[]> = new Map();
   private audioContext: AudioContext | null = null;
   private analysers: Map<string, AnalyserNode> = new Map();
   private volumeInterval: any = null;
+  private heartbeatInterval: any = null;
   public isSoloMode: boolean = false;
 
   public localUser: User | null = null;
   public roomId: string = '';
+  public currentUserName: string = '';
 
   // Event callbacks
   public onUserJoined?: (user: User, allUsers: User[]) => void;
@@ -84,13 +87,14 @@ export class WebRTCManager {
     serverUrl?: string
   ): Promise<{ user: User; users: User[]; bpm: number }> {
     this.roomId = roomId;
+    this.currentUserName = userName;
 
     // Request local camera and microphone stream
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
-          noiseSuppression: false, // Keep musical resonance
+          noiseSuppression: false,
           autoGainControl: true,
         },
         video: {
@@ -117,7 +121,6 @@ export class WebRTCManager {
       }
     }
 
-    // If no backend URL configured on production, enter resilient Solo/Creator mode
     if (!backendUrl) {
       console.info('[WebRTC] No external backend URL configured. Entering standalone Jam Stage.');
       return this.enterStandaloneMode(roomId, userName);
@@ -126,56 +129,62 @@ export class WebRTCManager {
     return new Promise((resolve) => {
       let hasResolved = false;
 
-      // Timeout fallback after 3.5s so users are NEVER stuck on "Connecting..."
+      // Timeout fallback after 6s (give Render time to wake up)
       const timeoutId = setTimeout(() => {
         if (!hasResolved) {
           hasResolved = true;
           console.warn('[WebRTC] Backend connection timed out. Launching standalone Jam Stage.');
           resolve(this.enterStandaloneMode(roomId, userName));
         }
-      }, 3500);
+      }, 6000);
 
       try {
         this.socket = io(backendUrl, {
           transports: ['websocket', 'polling'],
-          timeout: 3000,
-          reconnectionAttempts: 2,
+          timeout: 10000,
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 1000,
         });
 
         this.setupSocketListeners();
 
+        // Keep-alive heartbeat every 15s to prevent cloud proxy disconnects
+        if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = setInterval(() => {
+          if (this.socket?.connected) {
+            this.socket.emit('ping_heartbeat');
+          }
+        }, 15000);
+
         this.socket.on('connect_error', (err) => {
           console.warn('[WebRTC] Socket connect error:', err.message);
-          if (!hasResolved) {
-            hasResolved = true;
-            clearTimeout(timeoutId);
-            resolve(this.enterStandaloneMode(roomId, userName));
-          }
         });
 
-        this.socket.emit('join_room', { roomId, userName }, (res: any) => {
-          if (!hasResolved) {
-            hasResolved = true;
-            clearTimeout(timeoutId);
+        this.socket.on('connect', () => {
+          this.socket?.emit('join_room', { roomId, userName }, (res: any) => {
+            if (!hasResolved) {
+              hasResolved = true;
+              clearTimeout(timeoutId);
 
-            if (res?.success) {
-              this.localUser = res.user;
+              if (res?.success) {
+                this.localUser = res.user;
 
-              // Start audio monitoring for local user
-              if (this.localStream && this.localUser) {
-                this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
+                if (this.localStream && this.localUser) {
+                  this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
+                }
+                this.startVolumeMonitoring();
+
+                resolve({
+                  user: res.user,
+                  users: res.room.users,
+                  bpm: res.room.bpm,
+                });
+              } else {
+                resolve(this.enterStandaloneMode(roomId, userName));
               }
-              this.startVolumeMonitoring();
-
-              resolve({
-                user: res.user,
-                users: res.room.users,
-                bpm: res.room.bpm,
-              });
-            } else {
-              resolve(this.enterStandaloneMode(roomId, userName));
             }
-          }
+          });
         });
       } catch (err) {
         if (!hasResolved) {
@@ -187,7 +196,7 @@ export class WebRTCManager {
     });
   }
 
-  // Standalone mode fallback when external backend is offline
+  // Standalone mode fallback
   private enterStandaloneMode(roomId: string, userName: string): { user: User; users: User[]; bpm: number } {
     this.isSoloMode = true;
     const randomInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
@@ -216,6 +225,12 @@ export class WebRTCManager {
 
   private setupSocketListeners() {
     if (!this.socket) return;
+
+    // Auto rejoin on reconnect
+    this.socket.on('reconnect', () => {
+      console.log('[WebRTC] Reconnected to server, re-joining room:', this.roomId);
+      this.socket?.emit('join_room', { roomId: this.roomId, userName: this.currentUserName });
+    });
 
     this.socket.on('user_joined', async ({ user, allUsers }: { user: User; allUsers: User[] }) => {
       this.onUserJoined?.(user, allUsers);
@@ -284,14 +299,22 @@ export class WebRTCManager {
       this.onRemoteStream?.(peerSocketId, stream);
     };
 
+    // Auto-restart ICE on connection failure
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'failed') {
+        console.warn('[WebRTC] ICE failed for peer', peerSocketId, 'restarting ICE...');
+        pc.restartIce();
+      }
+    };
+
     this.peerConnections.set(peerSocketId, pc);
     return pc;
   }
 
-  private async createOfferForPeer(peerSocketId: string) {
-    const pc = this.createPeerConnection(peerSocketId);
+  private async createOfferForPeer(peerSocketId: string, iceRestart = false) {
+    const pc = this.peerConnections.get(peerSocketId) || this.createPeerConnection(peerSocketId);
     try {
-      const offer = await pc.createOffer();
+      const offer = await pc.createOffer({ iceRestart });
       await pc.setLocalDescription(offer);
 
       this.socket?.emit('webrtc_signal', {
@@ -312,6 +335,14 @@ export class WebRTCManager {
 
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      
+      // Flush buffered ICE candidates
+      const queued = this.candidateQueue.get(peerSocketId) || [];
+      for (const cand of queued) {
+        await pc.addIceCandidate(new RTCIceCandidate(cand));
+      }
+      this.candidateQueue.delete(peerSocketId);
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -330,6 +361,13 @@ export class WebRTCManager {
     if (pc) {
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+        // Flush buffered ICE candidates
+        const queued = this.candidateQueue.get(peerSocketId) || [];
+        for (const cand of queued) {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        }
+        this.candidateQueue.delete(peerSocketId);
       } catch (e) {
         console.error('[WebRTC] Handle answer error:', e);
       }
@@ -338,12 +376,17 @@ export class WebRTCManager {
 
   private async handleIceCandidate(peerSocketId: string, candidate: RTCIceCandidateInit) {
     const pc = this.peerConnections.get(peerSocketId);
-    if (pc && candidate) {
+    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (e) {
         console.error('[WebRTC] Add ICE candidate error:', e);
       }
+    } else {
+      // Buffer candidate until remote description is set
+      const queued = this.candidateQueue.get(peerSocketId) || [];
+      queued.push(candidate);
+      this.candidateQueue.set(peerSocketId, queued);
     }
   }
 
@@ -389,7 +432,6 @@ export class WebRTCManager {
     this.socket?.emit('send_chat', { text, userName });
   }
 
-  // Attach real-time audio analyser to a stream for microphone reactivity
   private attachAudioAnalyser(socketId: string, stream: MediaStream) {
     try {
       if (!this.audioContext) {
@@ -411,7 +453,6 @@ export class WebRTCManager {
     }
   }
 
-  // Fast 40ms continuous volume analysis loop
   private startVolumeMonitoring() {
     if (typeof window === 'undefined') return;
 
@@ -440,14 +481,17 @@ export class WebRTCManager {
       pc.close();
       this.peerConnections.delete(socketId);
     }
+    this.candidateQueue.delete(socketId);
     this.analysers.delete(socketId);
     this.remoteStreams.delete(socketId);
   }
 
   public disconnect() {
     if (this.volumeInterval) clearInterval(this.volumeInterval);
+    if (this.heartbeatInterval) clearInterval(this.heartbeatInterval);
     this.peerConnections.forEach((pc) => pc.close());
     this.peerConnections.clear();
+    this.candidateQueue.clear();
     this.analysers.clear();
     this.remoteStreams.clear();
     this.localStream?.getTracks().forEach((track) => track.stop());
