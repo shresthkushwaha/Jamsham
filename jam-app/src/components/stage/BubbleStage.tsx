@@ -77,7 +77,10 @@ export default function BubbleStage({
   const positions = useBubblePhysics(effectiveUsers, activeNotesByUser, volumeLevels, {
     containerWidth: dimensions.width,
     containerHeight: dimensions.height,
-    gap: 28,
+    gap: 22,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingX: 20,
   });
 
   return (
