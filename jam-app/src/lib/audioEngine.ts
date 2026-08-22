@@ -129,34 +129,34 @@ class AudioEngine {
     if (!this.isInitialized) return;
 
     try {
+      if (Tone.context.state !== 'running') {
+        Tone.context.resume();
+      }
+
       const now = Tone.now();
-      switch (instrumentId) {
-        case 'DRUM':
-          this.playDrumSound(noteOrType as string, velocity, now);
-          break;
-        case 'GUITAR':
-          if (this.guitarSynth) {
-            if (Array.isArray(noteOrType)) {
-              noteOrType.forEach((n, idx) => {
-                this.guitarSynth?.triggerAttack(n, now + idx * 0.03);
-              });
-            } else if (typeof noteOrType === 'string') {
-              this.guitarSynth.triggerAttack(noteOrType, now);
-            }
+      const id = (instrumentId || '').toUpperCase();
+
+      if (id.includes('DRUM')) {
+        this.playDrumSound(noteOrType as string, velocity, now);
+      } else if (id.includes('GUITAR') || id.includes('BASS')) {
+        if (this.guitarSynth) {
+          if (Array.isArray(noteOrType)) {
+            noteOrType.forEach((n, idx) => {
+              this.guitarSynth?.triggerAttack(n, now + idx * 0.03);
+            });
+          } else if (typeof noteOrType === 'string') {
+            this.guitarSynth.triggerAttack(noteOrType, now);
           }
-          break;
-        case 'KEYBOARD':
-          if (this.keyboardSynth) {
-            this.keyboardSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
-          }
-          break;
-        case 'TRUMPET':
-          if (this.trumpetSynth) {
-            this.trumpetSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
-          }
-          break;
-        default:
-          break;
+        }
+      } else if (id.includes('TRUMPET') || id.includes('SAX') || id.includes('BRASS')) {
+        if (this.trumpetSynth) {
+          this.trumpetSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
+        }
+      } else {
+        // Default to KEYBOARD / PIANO Synth
+        if (this.keyboardSynth) {
+          this.keyboardSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
+        }
       }
     } catch (e) {
       console.warn('[AudioEngine] Play error:', e);
@@ -206,9 +206,10 @@ class AudioEngine {
   public stopNote(instrumentId: string, note?: string) {
     if (!this.isInitialized) return;
     try {
-      if (instrumentId === 'KEYBOARD' && this.keyboardSynth && note) {
+      const id = (instrumentId || '').toUpperCase();
+      if ((id.includes('KEYBOARD') || id.includes('PIANO') || id.includes('LEAD')) && this.keyboardSynth && note) {
         this.keyboardSynth.triggerRelease(note);
-      } else if (instrumentId === 'TRUMPET' && this.trumpetSynth && note) {
+      } else if ((id.includes('TRUMPET') || id.includes('SAX') || id.includes('BRASS')) && this.trumpetSynth && note) {
         this.trumpetSynth.triggerRelease(note);
       }
       // Guitar is plucked, doesn't need explicit stop unless we want to damp it.
