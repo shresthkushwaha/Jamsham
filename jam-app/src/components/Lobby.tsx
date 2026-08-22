@@ -1,66 +1,111 @@
 'use client';
-import React, { useState } from 'react';
-import { Radio, Music, Sparkles, ArrowRight, Dices } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Radio, PlusCircle, LogIn, ArrowRight, Dices, ShieldCheck } from 'lucide-react';
 
 interface LobbyProps {
   onJoin: (roomId: string, userName: string) => void;
   isLoading?: boolean;
+  defaultRoomId?: string;
 }
 
 const INSTRUMENT_SHOWCASE = [
-  { name: 'Drum Kit', role: 'Rhythm & Beats', color: '#FF5722', icon: '🥁' },
-  { name: 'Sub Bass', role: 'Groove & Low End', color: '#E040FB', icon: '🎸' },
-  { name: 'Lead Synth', role: 'Melody & Solo', color: '#00E676', icon: '🎹' },
-  { name: 'Ambient Pad', role: 'Harmonies & Chords', color: '#00B0FF', icon: '🌊' },
-  { name: 'FX & Glitch', role: 'Textures & Drops', color: '#FFD600', icon: '✨' },
+  { name: 'Acoustic Drums', color: '#FF5722', icon: '🥁' },
+  { name: 'Acoustic / Electric Guitar', color: '#FF9800', icon: '🎸' },
+  { name: 'Electric Bass', color: '#E040FB', icon: '🎸' },
+  { name: 'Grand Piano', color: '#00E676', icon: '🎹' },
+  { name: 'Saxophone & Horns', color: '#FFD600', icon: '🎷' },
+  { name: 'String Section', color: '#00B0FF', icon: '🎻' },
 ];
 
-const RANDOM_ROOM_NAMES = ['jazz-cafe', 'neon-cyberpunk', 'funk-basement', 'lofi-rooftop', 'rock-garage'];
+function generateUniqueSessionKey(): string {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let s1 = '';
+  let s2 = '';
+  for (let i = 0; i < 4; i++) s1 += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 4; i++) s2 += chars.charAt(Math.floor(Math.random() * chars.length));
+  return `${s1}-${s2}`;
+}
 
-export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
+export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: LobbyProps) {
+  const [mode, setMode] = useState<'create' | 'join'>('create');
   const [userName, setUserName] = useState('');
-  const [roomId, setRoomId] = useState('jazz-cafe-123');
+  const [createdRoomId, setCreatedRoomId] = useState('');
+  const [joinRoomId, setJoinRoomId] = useState('');
 
-  const generateRandomRoom = () => {
-    const randomPrefix = RANDOM_ROOM_NAMES[Math.floor(Math.random() * RANDOM_ROOM_NAMES.length)];
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
-    setRoomId(`${randomPrefix}-${randomSuffix}`);
-  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlRoom = params.get('room');
+    if (urlRoom) {
+      setJoinRoomId(urlRoom);
+      setMode('join');
+    } else {
+      setCreatedRoomId(defaultRoomId || generateUniqueSessionKey());
+    }
+  }, [defaultRoomId]);
+
+  const handleRegenerateKey = () => setCreatedRoomId(generateUniqueSessionKey());
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!roomId.trim()) return;
-    onJoin(roomId.trim(), userName.trim() || 'Musician');
+    const finalRoomId = mode === 'create' ? createdRoomId.trim() : joinRoomId.trim();
+    if (!finalRoomId) return;
+    onJoin(finalRoomId, userName.trim() || (mode === 'create' ? 'Host' : 'Musician'));
   };
 
   return (
     <div style={lobbyWrapper}>
       <div style={lobbyCard}>
-        {/* Glow Effect */}
         <div style={glowBlob} />
 
-        {/* Title & Tagline */}
-        <div style={{ textAlign: 'center', marginBottom: '28px', position: 'relative', zIndex: 2 }}>
+        {/* Title */}
+        <div style={{ textAlign: 'center', marginBottom: '24px', position: 'relative', zIndex: 2 }}>
           <div style={badgeStyle}>
-            <Radio size={14} color="#00E676" style={{ animation: 'pulse 1.5s infinite' }} />
+            <Radio size={14} color="#00E676" />
             <span>REAL-TIME COLLABORATIVE STAGE</span>
           </div>
-
           <h1 style={titleGradient}>JAMSHAM</h1>
           <p style={subtitleStyle}>
-            Jam live with musicians worldwide. You will be automatically assigned an instrument to play together with
-            ultra-low latency video and audio chat.
+            Jam live with real-time video, audio, and sync. Each room is private and isolated by its session code.
           </p>
         </div>
 
-        {/* Form Inputs */}
+        {/* Create / Join Tabs */}
+        <div style={tabSelectorContainer}>
+          <button
+            type="button"
+            onClick={() => setMode('create')}
+            style={{
+              ...tabButton,
+              backgroundColor: mode === 'create' ? 'rgba(0, 230, 118, 0.15)' : 'transparent',
+              borderColor: mode === 'create' ? '#00E676' : 'transparent',
+              color: mode === 'create' ? '#00E676' : '#888',
+            }}
+          >
+            <PlusCircle size={15} />
+            <span>Create Room (Host)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('join')}
+            style={{
+              ...tabButton,
+              backgroundColor: mode === 'join' ? 'rgba(0, 176, 255, 0.15)' : 'transparent',
+              borderColor: mode === 'join' ? '#00B0FF' : 'transparent',
+              color: mode === 'join' ? '#00B0FF' : '#888',
+            }}
+          >
+            <LogIn size={15} />
+            <span>Join with Code</span>
+          </button>
+        </div>
+
+        {/* Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', zIndex: 2 }}>
           <div>
             <label style={labelStyle}>YOUR STAGE NAME</label>
             <input
-              suppressHydrationWarning
               type="text"
-              placeholder="e.g. Jimi, Miles, or Daft Punk"
+              placeholder={mode === 'create' ? 'e.g. Jimi (Host)' : 'e.g. Miles, Prince, Daft'}
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               style={inputStyle}
@@ -68,28 +113,39 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
             />
           </div>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={labelStyle}>ROOM ID</label>
-              <button suppressHydrationWarning type="button" onClick={generateRandomRoom} style={randomBtnStyle}>
-                <Dices size={12} style={{ marginRight: '4px' }} /> Randomize
-              </button>
+          {mode === 'create' ? (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label style={labelStyle}>NEW GENERATED SESSION CODE</label>
+                <button type="button" onClick={handleRegenerateKey} style={randomBtnStyle}>
+                  <Dices size={13} style={{ marginRight: '4px' }} /> New Code
+                </button>
+              </div>
+              <div style={keyDisplayContainer}>
+                <span style={keyDisplayCode}>Code- {createdRoomId || '...'}</span>
+                <span style={adminTagStyle}>
+                  <ShieldCheck size={12} /> You will be Admin
+                </span>
+              </div>
             </div>
-            <input
-              suppressHydrationWarning
-              type="text"
-              placeholder="e.g. jazz-cafe-123"
-              value={roomId}
-              onChange={(e) => setRoomId(e.target.value)}
-              style={inputStyle}
-              required
-            />
-          </div>
+          ) : (
+            <div>
+              <label style={labelStyle}>ENTER FRIEND'S SESSION CODE</label>
+              <input
+                type="text"
+                placeholder="e.g. jhfrfh-1234 or a8b2-c7d9"
+                value={joinRoomId}
+                onChange={(e) => setJoinRoomId(e.target.value)}
+                style={inputStyle}
+                required
+              />
+            </div>
+          )}
 
-          {/* Instrument Pool Preview */}
+          {/* Instrument Pool */}
           <div style={instrumentPoolContainer}>
             <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: 600 }}>
-              RANDOM INSTRUMENT ASSIGNMENT POOL:
+              BAND ROLES (AUTO-ASSIGNED ON JOIN):
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {INSTRUMENT_SHOWCASE.map((inst) => (
@@ -109,12 +165,21 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
             </div>
           </div>
 
-          <button suppressHydrationWarning type="submit" disabled={isLoading} style={joinBtnStyle}>
+          <button
+            type="submit"
+            disabled={isLoading || (mode === 'join' && !joinRoomId.trim())}
+            style={{
+              ...joinBtnStyle,
+              background: mode === 'create'
+                ? 'linear-gradient(90deg, #00E676 0%, #00B0FF 100%)'
+                : 'linear-gradient(90deg, #00B0FF 0%, #7C4DFF 100%)',
+            }}
+          >
             {isLoading ? (
               <span>Connecting to Stage...</span>
             ) : (
               <>
-                <span>Enter Jam Stage</span>
+                <span>{mode === 'create' ? 'Start Session (As Host)' : 'Join Jam Session'}</span>
                 <ArrowRight size={18} />
               </>
             )}
@@ -125,6 +190,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
   );
 }
 
+/* ── Styles ── */
 const lobbyWrapper: React.CSSProperties = {
   minHeight: '100vh',
   display: 'flex',
@@ -138,12 +204,12 @@ const lobbyCard: React.CSSProperties = {
   position: 'relative',
   width: '100%',
   maxWidth: '480px',
-  background: 'rgba(18, 18, 26, 0.85)',
+  background: 'rgba(18, 18, 26, 0.9)',
   backdropFilter: 'blur(24px)',
   border: '1px solid rgba(255, 255, 255, 0.1)',
   borderRadius: '24px',
   padding: '36px 32px',
-  boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6)',
+  boxShadow: '0 24px 64px rgba(0, 0, 0, 0.7)',
   overflow: 'hidden',
 };
 
@@ -152,7 +218,7 @@ const glowBlob: React.CSSProperties = {
   top: '-50px',
   left: '50%',
   transform: 'translateX(-50%)',
-  width: '260px',
+  width: '280px',
   height: '140px',
   background: 'radial-gradient(ellipse, rgba(0, 230, 118, 0.35) 0%, rgba(0, 176, 255, 0.15) 50%, transparent 70%)',
   pointerEvents: 'none',
@@ -189,6 +255,31 @@ const subtitleStyle: React.CSSProperties = {
   lineHeight: '1.5',
 };
 
+const tabSelectorContainer: React.CSSProperties = {
+  display: 'flex',
+  gap: '8px',
+  marginBottom: '20px',
+  background: 'rgba(0,0,0,0.3)',
+  padding: '4px',
+  borderRadius: '12px',
+  border: '1px solid rgba(255,255,255,0.06)',
+};
+
+const tabButton: React.CSSProperties = {
+  flex: 1,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  padding: '10px',
+  borderRadius: '8px',
+  border: '1px solid transparent',
+  fontSize: '12px',
+  fontWeight: 700,
+  cursor: 'pointer',
+  transition: 'all 0.15s ease',
+};
+
 const labelStyle: React.CSSProperties = {
   fontSize: '11px',
   fontWeight: 700,
@@ -207,8 +298,33 @@ const inputStyle: React.CSSProperties = {
   color: '#fff',
   fontSize: '14px',
   outline: 'none',
-  transition: 'border-color 0.2s',
   boxSizing: 'border-box',
+};
+
+const keyDisplayContainer: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  background: 'rgba(0, 230, 118, 0.06)',
+  border: '1px solid rgba(0, 230, 118, 0.25)',
+  borderRadius: '12px',
+  padding: '12px 16px',
+};
+
+const keyDisplayCode: React.CSSProperties = {
+  fontSize: '15px',
+  fontWeight: 700,
+  color: '#ffffff',
+  letterSpacing: '0.5px',
+};
+
+const adminTagStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '4px',
+  fontSize: '11px',
+  fontWeight: 600,
+  color: '#00E676',
 };
 
 const randomBtnStyle: React.CSSProperties = {
@@ -241,7 +357,6 @@ const instPill: React.CSSProperties = {
 
 const joinBtnStyle: React.CSSProperties = {
   width: '100%',
-  background: 'linear-gradient(90deg, #00E676 0%, #00B0FF 100%)',
   border: 'none',
   borderRadius: '12px',
   padding: '14px',
@@ -253,7 +368,5 @@ const joinBtnStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: '8px',
-  boxShadow: '0 8px 24px rgba(0, 230, 118, 0.3)',
   marginTop: '8px',
-  transition: 'transform 0.1s ease',
 };
