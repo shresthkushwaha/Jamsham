@@ -14,6 +14,7 @@ interface MinimalHeaderProps {
   onToggleVideo: () => void;
   onBpmChange: (bpm: number) => void;
   onToggleRecord?: () => void;
+  onCloseRoom?: () => void;
   onLeave: () => void;
 }
 
@@ -29,6 +30,7 @@ export default function MinimalHeader({
   onToggleVideo,
   onBpmChange,
   onToggleRecord,
+  onCloseRoom,
   onLeave,
 }: MinimalHeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -171,6 +173,26 @@ export default function MinimalHeader({
                   style={{ width: '100%', accentColor: '#00E676' }}
                 />
               </div>
+
+              {/* Admin: End Session For Everyone */}
+              {isAdmin && onCloseRoom && (
+                <button
+                  onClick={() => {
+                    if (confirm('Are you sure you want to end this jam session and close the room for all participants?')) {
+                      onCloseRoom();
+                    }
+                  }}
+                  style={{
+                    ...leaveBtnStyle,
+                    backgroundColor: '#D32F2F',
+                    borderColor: '#FF5252',
+                    color: '#ffffff',
+                  }}
+                >
+                  <LogOut size={16} />
+                  <span>End Session (Close Room for All)</span>
+                </button>
+              )}
 
               {/* Leave Room Button */}
               <button onClick={onLeave} style={leaveBtnStyle}>

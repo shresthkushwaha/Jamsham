@@ -33,6 +33,19 @@ export default function JamRoomPage() {
     setAudioUnlocked(true);
   };
 
+  const handleLeave = () => {
+    if (isRecording) videoSessionRecorder.stop();
+    livekitRef.current?.disconnect();
+    livekitRef.current = null;
+    setIsInRoom(false);
+    setUsers([]);
+    setRemoteStreams(new Map());
+    setActiveNotesByUser({});
+    setLocalUser(null);
+    setLocalStream(null);
+    setIsRecording(false);
+  };
+
   const handleJoin = async (targetRoomId: string, userName: string) => {
     setIsLoading(true);
     try {
@@ -81,6 +94,20 @@ export default function JamRoomPage() {
       manager.onBpmUpdated = (newBpm) => setBpm(newBpm);
       manager.onVolumeLevels = (levels) => setVolumeLevels(levels);
 
+      // Admin event handlers
+      manager.onRoomClosed = () => {
+        alert('The session host has ended the jam session.');
+        handleLeave();
+      };
+      manager.onKicked = (reason) => {
+        alert(reason || 'You were removed from the jam room by the host.');
+        handleLeave();
+      };
+      manager.onMutedByAdmin = (muted) => {
+        setIsMuted(muted);
+        alert(muted ? 'The host has muted your microphone.' : 'The host has unmuted your microphone.');
+      };
+
       const { user, users: roomUsers, bpm: roomBpm } = await manager.connectAndJoin(targetRoomId, userName);
 
       setLocalUser(user);
@@ -112,6 +139,20 @@ export default function JamRoomPage() {
   const handleBpmChange = (newBpm: number) => {
     setBpm(newBpm);
     livekitRef.current?.setBpm(newBpm);
+  };
+
+  // Admin Actions
+  const handleCloseRoom = () => {
+    livekitRef.current?.emitCloseRoom();
+    handleLeave();
+  };
+
+  const handleAdminMute = (targetId: string, muted: boolean) => {
+    livekitRef.current?.emitMuteUser(targetId, muted);
+  };
+
+  const handleAdminKick = (targetId: string) => {
+    livekitRef.current?.emitKickUser(targetId);
   };
 
   const handleToggleRecord = async () => {
@@ -180,28 +221,15 @@ export default function JamRoomPage() {
     }
   };
 
-  const handleLeave = () => {
-    if (isRecording) videoSessionRecorder.stop();
-    livekitRef.current?.disconnect();
-    livekitRef.current = null;
-    setIsInRoom(false);
-    setUsers([]);
-    setRemoteStreams(new Map());
-    setActiveNotesByUser({});
-    setLocalUser(null);
-    setLocalStream(null);
-    setIsRecording(false);
-  };
-
   const handleNotePlay = (note: string | string[]) => {
     if (!localUser) return;
     const notesArr = Array.isArray(note) ? note : [note];
-    audioEngine.playNote(localUser.instrument?.id || 'PIANO', note as string, '8n', 90);
+    audioEngine.playNote(localUser.instrument?.id || 'KEYBOARD', note as string, '8n', 90);
     setActiveNotesByUser((prev) => ({
       ...prev,
       [localUser.socketId]: [...new Set([...(prev[localUser.socketId] || []), ...notesArr])],
     }));
-    livekitRef.current?.emitNotePlay({ instrument: localUser.instrument?.id || 'PIANO', note, duration: '8n', velocity: 90 });
+    livekitRef.current?.emitNotePlay({ instrument: localUser.instrument?.id || 'KEYBOARD', note, duration: '8n', velocity: 90 });
   };
 
   const handleNoteStop = (note: string | string[]) => {
@@ -211,7 +239,7 @@ export default function JamRoomPage() {
       ...prev,
       [localUser.socketId]: (prev[localUser.socketId] || []).filter((n) => !notesArr.includes(n)),
     }));
-    livekitRef.current?.emitNoteStop({ instrument: localUser.instrument?.id || 'PIANO', note });
+    livekitRef.current?.emitNoteStop({ instrument: localUser.instrument?.id || 'KEYBOARD', note });
   };
 
   if (!isInRoom) {
@@ -247,7 +275,7 @@ export default function JamRoomPage() {
         </div>
       )}
 
-      {/* 1. Minimalist Header */}
+      {/* 1. Minimalist Header with Admin Close Room option */}
       <MinimalHeader
         roomId={roomId}
         userCount={users.length > 0 ? users.length : 1}
@@ -260,10 +288,11 @@ export default function JamRoomPage() {
         onToggleVideo={handleToggleVideo}
         onBpmChange={handleBpmChange}
         onToggleRecord={handleToggleRecord}
+        onCloseRoom={handleCloseRoom}
         onLeave={handleLeave}
       />
 
-      {/* 2. Physics Bubble Stage */}
+      {/* 2. Physics Bubble Stage with Admin Mute / Kick controls */}
       <BubbleStage
         users={users.length > 0 ? users : localUser ? [localUser] : []}
         localUser={localUser}
@@ -271,11 +300,13 @@ export default function JamRoomPage() {
         remoteStreams={remoteStreams}
         activeNotesByUser={activeNotesByUser}
         volumeLevels={volumeLevels}
+        onAdminMute={handleAdminMute}
+        onAdminKick={handleAdminKick}
       />
 
       {/* 3. Note Trigger Deck at the bottom */}
       <NoteTriggerDeck
-        instrumentId={localUser?.instrument?.id || 'PIANO'}
+        instrumentId={localUser?.instrument?.id || 'KEYBOARD'}
         instrumentName={localUser?.instrument?.name}
         instrumentColor={localUser?.instrument?.color}
         onPlay={handleNotePlay}

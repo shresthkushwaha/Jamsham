@@ -2,15 +2,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { User } from '@/lib/webrtcManager';
 import { useParticipantEnergy } from '@/lib/useParticipantEnergy';
+import { MicOff, Mic, UserX } from 'lucide-react';
 
 interface PlayerOrbProps {
   user: User;
   isLocal: boolean;
+  isLocalAdmin?: boolean;
   stream?: MediaStream | null;
   volume?: number;
   activeNotes?: string[];
   roleColor?: string;
   defaultSize?: number;
+  onAdminMute?: (targetId: string, muted: boolean) => void;
+  onAdminKick?: (targetId: string) => void;
 }
 
 const INSTRUMENT_ICONS: Record<string, string> = {
@@ -42,18 +46,21 @@ const INSTRUMENT_COLORS: Record<string, string> = {
 export default function PlayerOrb({
   user,
   isLocal,
+  isLocalAdmin = false,
   stream,
   volume = 0,
   activeNotes = [],
   roleColor,
   defaultSize,
+  onAdminMute,
+  onAdminKick,
 }: PlayerOrbProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [hasLiveVideo, setHasLiveVideo] = useState(false);
 
-  const instKey = (user.instrument?.id || user.instrument?.name || 'PIANO').toUpperCase();
-  const baseColor = roleColor || INSTRUMENT_COLORS[instKey] || user.instrument?.color || '#9C27B0';
+  const instKey = (user.instrument?.id || user.instrument?.name || 'KEYBOARD').toUpperCase();
+  const baseColor = roleColor || INSTRUMENT_COLORS[instKey] || user.instrument?.color || '#00E676';
   const iconEmoji = INSTRUMENT_ICONS[instKey] || '🎵';
 
   // Sizing driven by note energy and mic volume
@@ -124,6 +131,80 @@ export default function PlayerOrb({
     >
       {/* Dedicated Audio Element for Peer Voice */}
       {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
+
+      {/* Admin Floating Control Toolbar (Only visible to Admin for Remote Peers) */}
+      {isLocalAdmin && !isLocal && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '-12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            backgroundColor: 'rgba(15, 16, 24, 0.85)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '16px',
+            padding: '3px 8px',
+            zIndex: 10,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.6)',
+          }}
+        >
+          {/* Admin Mute Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdminMute?.(user.socketId, !user.isMuted);
+            }}
+            style={{
+              background: user.isMuted ? '#EF5350' : 'transparent',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              fontSize: '10px',
+              fontWeight: 600,
+              gap: '3px',
+            }}
+            title={user.isMuted ? 'Unmute User' : 'Mute User'}
+          >
+            {user.isMuted ? <MicOff size={12} /> : <Mic size={12} />}
+            <span>{user.isMuted ? 'Muted' : 'Mute'}</span>
+          </button>
+
+          {/* Admin Kick Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Are you sure you want to remove ${user.userName} from this jam session?`)) {
+                onAdminKick?.(user.socketId);
+              }
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '10px',
+              padding: '4px 6px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#EF5350',
+              fontSize: '10px',
+              fontWeight: 600,
+              gap: '3px',
+            }}
+            title="Kick User From Room"
+          >
+            <UserX size={12} />
+            <span>Kick</span>
+          </button>
+        </div>
+      )}
 
       {/* Speaking Soundwave Aura */}
       {isSpeaking && (

@@ -56,6 +56,9 @@ export class LiveKitManager {
   public onMediaUpdated?: (socketId: string, isMuted: boolean, isVideoOff: boolean) => void;
   public onBpmUpdated?: (bpm: number) => void;
   public onVolumeLevels?: (levels: Record<string, number>) => void;
+  public onRoomClosed?: () => void;
+  public onKicked?: (reason?: string) => void;
+  public onMutedByAdmin?: (isMuted: boolean) => void;
 
   public async connectAndJoin(
     roomId: string,
@@ -195,7 +198,7 @@ export class LiveKitManager {
       this.onUserLeft?.(identity, allUsers);
     });
 
-    // Data Received (Ultra-low latency Note Events & Chat)
+    // Data Received (Ultra-low latency Note Events, Chat, and Admin Controls)
     this.room.on(RoomEvent.DataReceived, (payload: Uint8Array, participant?: RemoteParticipant) => {
       try {
         const text = new TextDecoder().decode(payload);
@@ -213,6 +216,17 @@ export class LiveKitManager {
           });
         } else if (data.type === 'bpm_updated') {
           this.onBpmUpdated?.(data.bpm);
+        } else if (data.type === 'close_room') {
+          this.onRoomClosed?.();
+        } else if (data.type === 'admin_kick_user') {
+          if (data.targetIdentity === this.localUser?.socketId) {
+            this.onKicked?.('The session host has removed you from the room.');
+          }
+        } else if (data.type === 'admin_mute_user') {
+          if (data.targetIdentity === this.localUser?.socketId) {
+            this.toggleMute(data.isMuted);
+            this.onMutedByAdmin?.(data.isMuted);
+          }
         }
       } catch (err) {
         console.warn('[LiveKit Data Parse Error]:', err);
@@ -231,7 +245,7 @@ export class LiveKitManager {
     return {
       socketId: participant.identity,
       userName: participant.name || metadata.userName || participant.identity.split('-')[0],
-      instrument: metadata.instrument || { id: 'PIANO', name: 'Grand Piano', color: '#00E676', role: 'Melody & Harmony' },
+      instrument: metadata.instrument || { id: 'KEYBOARD', name: 'Keyboard', color: '#00E676', role: 'Melody & Harmony' },
       isAdmin: !!metadata.isAdmin,
       isMuted: !participant.isMicrophoneEnabled,
       isVideoOff: !participant.isCameraEnabled,
@@ -261,7 +275,7 @@ export class LiveKitManager {
   public emitNotePlay(event: NoteEvent) {
     if (!this.room) return;
     const payload = new TextEncoder().encode(JSON.stringify({ type: 'note_play', event }));
-    this.room.localParticipant.publishData(payload, { reliable: false }); // Loss-tolerant sub-10ms delivery
+    this.room.localParticipant.publishData(payload, { reliable: false });
   }
 
   public emitNoteStop(event: NoteEvent) {
@@ -273,6 +287,27 @@ export class LiveKitManager {
   public setBpm(bpm: number) {
     if (!this.room) return;
     const payload = new TextEncoder().encode(JSON.stringify({ type: 'bpm_updated', bpm }));
+    this.room.localParticipant.publishData(payload, { reliable: true });
+  }
+
+  // Admin: Close room for all participants
+  public emitCloseRoom() {
+    if (!this.room) return;
+    const payload = new TextEncoder().encode(JSON.stringify({ type: 'close_room' }));
+    this.room.localParticipant.publishData(payload, { reliable: true });
+  }
+
+  // Admin: Mute specific remote participant
+  public emitMuteUser(targetIdentity: string, isMuted: boolean = true) {
+    if (!this.room) return;
+    const payload = new TextEncoder().encode(JSON.stringify({ type: 'admin_mute_user', targetIdentity, isMuted }));
+    this.room.localParticipant.publishData(payload, { reliable: true });
+  }
+
+  // Admin: Kick specific remote participant from room
+  public emitKickUser(targetIdentity: string) {
+    if (!this.room) return;
+    const payload = new TextEncoder().encode(JSON.stringify({ type: 'admin_kick_user', targetIdentity }));
     this.room.localParticipant.publishData(payload, { reliable: true });
   }
 

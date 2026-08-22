@@ -11,20 +11,22 @@ interface BubbleStageProps {
   remoteStreams: Map<string, MediaStream>;
   volumeLevels: Record<string, number>;
   activeNotesByUser: Record<string, string[]>;
+  onAdminMute?: (targetId: string, muted: boolean) => void;
+  onAdminKick?: (targetId: string) => void;
 }
 
 // Fallback visual colors for roles
 const ROLE_COLORS: Record<string, string> = {
-  PIANO: '#9C27B0',
-  LEAD: '#9C27B0',
-  HORN: '#C62828',
-  BRASS: '#C62828',
-  GUITAR: '#2E7D32',
-  SAX: '#FBC02D',
-  DRUMS: '#00ACC1',
-  BASS: '#7B1FA2',
-  STRINGS: '#1976D2',
-  PAD: '#00897B',
+  PIANO: '#00E676',
+  KEYBOARD: '#00E676',
+  GUITAR: '#FF9800',
+  DRUM: '#FF5722',
+  DRUMS: '#FF5722',
+  SITAR: '#E040FB',
+  FLUTE: '#00B0FF',
+  TRUMPET: '#FFD600',
+  SAXOPHONE: '#AB47BC',
+  SAX: '#AB47BC',
 };
 
 export default function BubbleStage({
@@ -34,6 +36,8 @@ export default function BubbleStage({
   remoteStreams,
   volumeLevels,
   activeNotesByUser,
+  onAdminMute,
+  onAdminKick,
 }: BubbleStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 900, height: 520 });
@@ -46,7 +50,7 @@ export default function BubbleStage({
       {
         socketId: 'local-host',
         userName: 'Host',
-        instrument: { id: 'PIANO', name: 'Grand Piano', color: '#9C27B0', role: 'Melody & Harmony' },
+        instrument: { id: 'KEYBOARD', name: 'Keyboard', color: '#00E676', role: 'Melody & Harmony' },
       },
     ];
   }, [users, localUser]);
@@ -85,8 +89,8 @@ export default function BubbleStage({
           const stream = isLocal ? localStream : remoteStreams.get(user.socketId);
           const volume = volumeLevels[user.socketId] || 0;
           const activeNotes = activeNotesByUser[user.socketId] || [];
-          const roleId = (user.instrument?.id || 'PIANO').toUpperCase();
-          const roleColor = user.instrument?.color || ROLE_COLORS[roleId] || '#9C27B0';
+          const roleId = (user.instrument?.id || 'KEYBOARD').toUpperCase();
+          const roleColor = user.instrument?.color || ROLE_COLORS[roleId] || '#00E676';
 
           const pos = positions[user.socketId] || {
             x: dimensions.width * 0.5,
@@ -114,11 +118,14 @@ export default function BubbleStage({
               <PlayerOrb
                 user={user}
                 isLocal={isLocal}
+                isLocalAdmin={!!localUser?.isAdmin}
                 stream={stream}
                 volume={volume}
                 activeNotes={activeNotes}
                 roleColor={roleColor}
                 defaultSize={diameter}
+                onAdminMute={onAdminMute}
+                onAdminKick={onAdminKick}
               />
             </div>
           );
