@@ -33,6 +33,15 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+const INSTRUMENT_POOL = [
+  { id: 'DRUMS', name: 'Acoustic Drums', role: 'Rhythm & Beats', color: '#FF5722' },
+  { id: 'GUITAR', name: 'Acoustic / Electric Guitar', role: 'Chords & Riffs', color: '#FF9800' },
+  { id: 'BASS', name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB' },
+  { id: 'PIANO', name: 'Grand Piano', role: 'Melody & Harmony', color: '#00E676' },
+  { id: 'SAX', name: 'Saxophone & Horns', role: 'Soulful Leads', color: '#FFD600' },
+  { id: 'STRINGS', name: 'String Section', role: 'Violin & Cello Swells', color: '#00B0FF' },
+];
+
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -53,6 +62,7 @@ export class WebRTCManager {
   private audioContext: AudioContext | null = null;
   private analysers: Map<string, AnalyserNode> = new Map();
   private volumeInterval: any = null;
+  public isSoloMode: boolean = false;
 
   public localUser: User | null = null;
   public roomId: string = '';
@@ -75,18 +85,7 @@ export class WebRTCManager {
   ): Promise<{ user: User; users: User[]; bpm: number }> {
     this.roomId = roomId;
 
-    const backendUrl =
-      serverUrl ||
-      process.env.NEXT_PUBLIC_JAM_SERVER_URL ||
-      (typeof window !== 'undefined'
-        ? `${window.location.protocol}//${window.location.hostname}:3001`
-        : 'http://localhost:3001');
-
-    this.socket = io(backendUrl, {
-      transports: ['websocket', 'polling'],
-    });
-
-    // Request local media stream
+    // Request local camera and microphone stream
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -105,30 +104,111 @@ export class WebRTCManager {
       this.localStream = new MediaStream();
     }
 
-    this.setupSocketListeners();
+    // Determine WebSocket backend URL
+    const envUrl = process.env.NEXT_PUBLIC_JAM_SERVER_URL;
+    let backendUrl = serverUrl || envUrl;
 
-    return new Promise((resolve, reject) => {
-      this.socket?.emit('join_room', { roomId, userName }, (res: any) => {
-        if (res?.success) {
-          this.localUser = res.user;
+    if (!backendUrl && typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        backendUrl = 'http://localhost:3001';
+      }
+    }
 
-          // Start audio monitoring for local user
-          if (this.localStream && this.localUser) {
-            this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
-          }
+    // If no backend URL configured on production, enter resilient Solo/Creator mode
+    if (!backendUrl) {
+      console.info('[WebRTC] No external backend URL configured. Entering standalone Jam Stage.');
+      return this.enterStandaloneMode(roomId, userName);
+    }
 
-          this.startVolumeMonitoring();
+    return new Promise((resolve) => {
+      let hasResolved = false;
 
-          resolve({
-            user: res.user,
-            users: res.room.users,
-            bpm: res.room.bpm,
-          });
-        } else {
-          reject(new Error('Failed to join room'));
+      // Timeout fallback after 3.5s so users are NEVER stuck on "Connecting..."
+      const timeoutId = setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          console.warn('[WebRTC] Backend connection timed out. Launching standalone Jam Stage.');
+          resolve(this.enterStandaloneMode(roomId, userName));
         }
-      });
+      }, 3500);
+
+      try {
+        this.socket = io(backendUrl, {
+          transports: ['websocket', 'polling'],
+          timeout: 3000,
+          reconnectionAttempts: 2,
+        });
+
+        this.setupSocketListeners();
+
+        this.socket.on('connect_error', (err) => {
+          console.warn('[WebRTC] Socket connect error:', err.message);
+          if (!hasResolved) {
+            hasResolved = true;
+            clearTimeout(timeoutId);
+            resolve(this.enterStandaloneMode(roomId, userName));
+          }
+        });
+
+        this.socket.emit('join_room', { roomId, userName }, (res: any) => {
+          if (!hasResolved) {
+            hasResolved = true;
+            clearTimeout(timeoutId);
+
+            if (res?.success) {
+              this.localUser = res.user;
+
+              // Start audio monitoring for local user
+              if (this.localStream && this.localUser) {
+                this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
+              }
+              this.startVolumeMonitoring();
+
+              resolve({
+                user: res.user,
+                users: res.room.users,
+                bpm: res.room.bpm,
+              });
+            } else {
+              resolve(this.enterStandaloneMode(roomId, userName));
+            }
+          }
+        });
+      } catch (err) {
+        if (!hasResolved) {
+          hasResolved = true;
+          clearTimeout(timeoutId);
+          resolve(this.enterStandaloneMode(roomId, userName));
+        }
+      }
     });
+  }
+
+  // Standalone mode fallback when external backend is offline
+  private enterStandaloneMode(roomId: string, userName: string): { user: User; users: User[]; bpm: number } {
+    this.isSoloMode = true;
+    const randomInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
+    const mockUser: User = {
+      socketId: `solo-${Math.random().toString(36).substring(2, 9)}`,
+      userName: userName || 'Host',
+      instrument: randomInst,
+      isAdmin: true,
+      isMuted: false,
+      isVideoOff: false,
+    };
+
+    this.localUser = mockUser;
+
+    if (this.localStream) {
+      this.attachAudioAnalyser(mockUser.socketId, this.localStream);
+    }
+    this.startVolumeMonitoring();
+
+    return {
+      user: mockUser,
+      users: [mockUser],
+      bpm: 120,
+    };
   }
 
   private setupSocketListeners() {
@@ -342,8 +422,7 @@ export class WebRTCManager {
         analyser.getByteFrequencyData(data);
         let sum = 0;
         for (let i = 0; i < data.length; i++) sum += data[i];
-        const avg = sum / data.length; // 0 to 255
-        // Boost sensitivity for subtle voice talking
+        const avg = sum / data.length;
         const normalized = Math.min(100, Math.round((avg / 80) * 100));
         levels[socketId] = normalized;
       });
