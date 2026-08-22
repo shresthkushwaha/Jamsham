@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import BottomInstrumentPanel from '@/components/BottomInstrumentPanel';
 
 export interface NotePadConfig {
   label: string;
@@ -312,57 +313,19 @@ export default function NoteTriggerDeck({
   };
 
   return (
-    <div
-      style={deckContainerStyle}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
-    >
-      <div style={padsRowStyle}>
-        {currentPads.map((pad, index) => {
-          const valueString = Array.isArray(pad.value) ? pad.value.join('+') : pad.value;
-          const isPressed =
-            pressedPads[index] ||
-            activeNotes.includes(valueString) ||
-            (typeof pad.value === 'string' && activeNotes.includes(pad.value));
-
-          return (
-            <button
-              key={`${pad.label}-${index}`}
-              data-pad-index={index}
-              onMouseDown={() => handleMouseDownOnPad(index)}
-              onMouseEnter={() => handleMouseEnterPad(index)}
-              onMouseLeave={() => handleMouseLeavePad(index)}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                triggerPadAttack(index);
-              }}
-              style={{
-                ...padCircleStyle,
-                backgroundColor: isPressed ? '#ffffff' : '#d2d6db',
-                color: isPressed ? instrumentColor : '#2b313a',
-                transform: isPressed ? 'scale(0.91)' : 'scale(1)',
-                boxShadow: isPressed
-                  ? `0 0 20px ${instrumentColor}, 0 2px 6px rgba(0,0,0,0.35)`
-                  : '0 4px 10px rgba(0,0,0,0.15)',
-              }}
-            >
-              <span
-                style={{
-                  ...noteLabelStyle,
-                  fontSize: pad.label.length > 5 ? '10px' : pad.label.length > 3 ? '11px' : '13px',
-                }}
-              >
-                {pad.label}
-              </span>
-              <span style={keyHintStyle}>
-                {pad.key}
-                {pad.altKey ? ` · ${pad.altKey}` : ''}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+    <div style={{ width: '100%', height: '170px', padding: '0 16px 12px 16px', boxSizing: 'border-box', zIndex: 20 }}>
+      <BottomInstrumentPanel
+        instrumentId={instrumentId}
+        instrumentName={instrumentName || instrumentId}
+        instrumentColor={instrumentColor}
+        onPlay={onPlay}
+        onStop={onStop}
+        activeNotes={activeNotes}
+        isMuted={false}
+        isVideoOff={false}
+        onToggleMute={() => {}}
+        onToggleVideo={() => {}}
+      />
     </div>
   );
 }
