@@ -111,6 +111,9 @@ export class WebRTCManager {
     if (!backendUrl && typeof window !== 'undefined') {
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         backendUrl = 'http://localhost:3001';
+      } else {
+        // Built-in default production server on Render
+        backendUrl = 'https://jamsham.onrender.com';
       }
     }
 
