@@ -17,6 +17,7 @@ interface BottomInstrumentPanelProps {
 export default function BottomInstrumentPanel({
   instrumentId,
   instrumentName,
+  instrumentColor = '#FF6D00',
   onPlay,
   onStop,
   activeNotes = [],
@@ -24,7 +25,9 @@ export default function BottomInstrumentPanel({
   const [localPressed, setLocalPressed] = useState<string[]>([]);
   const displayNotes = Array.from(new Set([...activeNotes, ...localPressed]));
 
-  const ACCENT_COLOR = '#7C4DFF';
+  const ACCENT_COLOR = instrumentColor || '#FF6D00';
+  const isMouseDownRef = React.useRef(false);
+  const activeHoverIdRef = React.useRef<string | null>(null);
 
   // --- KEYBOARD (SoundTrap C3-C5) ---
   const keyboardWhiteKeys = [
@@ -83,16 +86,16 @@ export default function BottomInstrumentPanel({
     k: { id: 'D_MAJOR', notes: ['D3', 'A3', 'D4', 'F#4'] },
   };
 
-  // --- DRUMS (Figma Layout + Set Stroke Colors + Green Outer Glow) ---
+  // --- DRUMS (Figma Layout + Matching Set Stroke Colors + Video Ring Color Highlight) ---
   const drumPads = [
-    { id: 'KICK', name: 'Kick', key: 'A', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'kick' },
-    { id: 'SNARE', name: 'Snare', key: 'S', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'snare' },
-    { id: 'HIHAT', name: 'Hi-Hat', key: 'D', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'hihat' },
-    { id: 'TOM 1', name: 'Tom 1', key: 'F', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'tom' },
-    { id: 'TOM 2', name: 'Tom 2', key: 'G', strokeColor: '#FFFFFF', setGroup: 'CYMBALS', icon: 'tom' },
-    { id: 'CRASH', name: 'Crash', key: 'H', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'crash' },
-    { id: 'CLAP', name: 'Clap', key: 'J', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'clap' },
-    { id: 'COWBELL', name: 'Cowbell', key: 'K', strokeColor: '#FF2D55', setGroup: 'SHELLS', icon: 'cowbell' },
+    { id: 'KICK', name: 'Kick', key: 'A', strokeColor: '#FF2D55', setGroup: 'BASS_SNARE', icon: 'kick' },
+    { id: 'SNARE', name: 'Snare', key: 'S', strokeColor: '#FF2D55', setGroup: 'BASS_SNARE', icon: 'snare' },
+    { id: 'HIHAT', name: 'Hi-Hat', key: 'D', strokeColor: '#00E676', setGroup: 'CYMBALS', icon: 'hihat' },
+    { id: 'TOM 1', name: 'Tom 1', key: 'F', strokeColor: '#FF6D00', setGroup: 'TOMS', icon: 'tom' },
+    { id: 'TOM 2', name: 'Tom 2', key: 'G', strokeColor: '#FF6D00', setGroup: 'TOMS', icon: 'tom' },
+    { id: 'CRASH', name: 'Crash', key: 'H', strokeColor: '#00E676', setGroup: 'CYMBALS', icon: 'crash' },
+    { id: 'CLAP', name: 'Clap', key: 'J', strokeColor: '#00E5FF', setGroup: 'PERC', icon: 'clap' },
+    { id: 'COWBELL', name: 'Cowbell', key: 'K', strokeColor: '#00E5FF', setGroup: 'PERC', icon: 'cowbell' },
   ];
 
   const drumKeyMap: Record<string, string> = {
@@ -115,12 +118,66 @@ export default function BottomInstrumentPanel({
     if (onStop) onStop(noteOrChordId);
   };
 
+  // Hover & Drag (Glissando) Interaction Handlers
+  const handleItemMouseDown = (id: string, notes?: string[]) => {
+    isMouseDownRef.current = true;
+    if (activeHoverIdRef.current && activeHoverIdRef.current !== id) {
+      triggerNoteOff(activeHoverIdRef.current);
+    }
+    activeHoverIdRef.current = id;
+    triggerNoteOn(id, notes);
+  };
+
+  const handleItemMouseEnter = (id: string, notes?: string[]) => {
+    if (isMouseDownRef.current) {
+      if (activeHoverIdRef.current && activeHoverIdRef.current !== id) {
+        triggerNoteOff(activeHoverIdRef.current);
+      }
+      activeHoverIdRef.current = id;
+      triggerNoteOn(id, notes);
+    }
+  };
+
+  const handleItemMouseLeave = (id: string) => {
+    if (isMouseDownRef.current && activeHoverIdRef.current === id) {
+      triggerNoteOff(id);
+      activeHoverIdRef.current = null;
+    }
+  };
+
+  const handleItemMouseUp = (id: string) => {
+    isMouseDownRef.current = false;
+    triggerNoteOff(id);
+    if (activeHoverIdRef.current === id) {
+      activeHoverIdRef.current = null;
+    }
+  };
+
+  // Global Pointer Up listener to stop active drag/glissando
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        if (activeHoverIdRef.current) {
+          triggerNoteOff(activeHoverIdRef.current);
+          activeHoverIdRef.current = null;
+        }
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalPointerUp);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalPointerUp);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+    };
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.repeat) return;
       const key = e.key.toLowerCase();
 
-      if (instrumentId === 'DRUM') {
+      if (instrumentId === 'DRUM' || instrumentId?.toUpperCase() === 'DRUMS') {
         const drumSound = drumKeyMap[key];
         if (drumSound && !localPressed.includes(drumSound)) {
           triggerNoteOn(drumSound);
@@ -142,7 +199,7 @@ export default function BottomInstrumentPanel({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const key = e.key.toLowerCase();
 
-      if (instrumentId === 'DRUM') {
+      if (instrumentId === 'DRUM' || instrumentId?.toUpperCase() === 'DRUMS') {
         const drumSound = drumKeyMap[key];
         if (drumSound) triggerNoteOff(drumSound);
       } else if (instrumentId === 'GUITAR') {
@@ -167,7 +224,7 @@ export default function BottomInstrumentPanel({
       {/* Instrument Surface Area */}
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
         {instrumentId?.toUpperCase() === 'DRUMS' || instrumentId?.toUpperCase() === 'DRUM' ? (
-          // FIGMA DRUM ROW INSTANCE (Image 1, 2 & 3 Recreation)
+          // FIGMA DRUM ROW INSTANCE (Scaled & Colored to Match Video Circle Stroke)
           <div style={figmaDrumWrapper}>
             <div style={figmaDrumRow}>
               {drumPads.map((pad) => {
@@ -175,14 +232,15 @@ export default function BottomInstrumentPanel({
                 return (
                   <button
                     key={pad.id}
-                    onMouseDown={() => triggerNoteOn(pad.id)}
-                    onMouseUp={() => triggerNoteOff(pad.id)}
-                    onMouseLeave={() => triggerNoteOff(pad.id)}
+                    onMouseDown={() => handleItemMouseDown(pad.id)}
+                    onMouseEnter={() => handleItemMouseEnter(pad.id)}
+                    onMouseLeave={() => handleItemMouseLeave(pad.id)}
+                    onMouseUp={() => handleItemMouseUp(pad.id)}
                     style={{
                       ...figmaDrumBtnStyle,
-                      border: isActive ? '5px solid #55FF66' : `3px solid ${pad.strokeColor}`,
+                      border: isActive ? `5px solid ${ACCENT_COLOR}` : `3px solid ${pad.strokeColor}`,
                       boxShadow: isActive
-                        ? '0 0 24px #55FF66, 0 0 45px rgba(85,255,102,0.65)'
+                        ? `0 0 26px ${ACCENT_COLOR}, 0 0 45px ${ACCENT_COLOR}90`
                         : '0 4px 12px rgba(0,0,0,0.4)',
                       transform: isActive ? 'scale(0.93)' : 'scale(1)',
                     }}
@@ -580,7 +638,7 @@ const clickLedStyle: React.CSSProperties = {
 
 const renderDrumIcon = (icon: string) => {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
       {icon === 'snare' || icon === 'tom' ? (
         <>
           <rect x="4" y="8" width="16" height="8" rx="2" />
@@ -618,14 +676,14 @@ const figmaDrumRow: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '14px',
+  gap: '18px',
   width: '100%',
   height: '100%',
 };
 
 const figmaDrumBtnStyle: React.CSSProperties = {
-  width: '58px',
-  height: '58px',
+  width: '76px',
+  height: '76px',
   borderRadius: '50%',
   background: '#14151B',
   display: 'flex',
@@ -638,8 +696,8 @@ const figmaDrumBtnStyle: React.CSSProperties = {
 };
 
 const figmaInnerCapStyle: React.CSSProperties = {
-  width: '82%',
-  height: '82%',
+  width: '84%',
+  height: '84%',
   borderRadius: '50%',
   background: 'radial-gradient(circle at 35% 35%, #2B2E38, #181920)',
   border: '2px solid #0D0E12',
@@ -651,8 +709,8 @@ const figmaInnerCapStyle: React.CSSProperties = {
 };
 
 const figmaKeyBadgeStyle: React.CSSProperties = {
-  fontSize: '8px',
+  fontSize: '10px',
   fontWeight: '800',
-  color: '#AAA',
-  marginTop: '1px',
+  color: '#BBB',
+  marginTop: '2px',
 };
