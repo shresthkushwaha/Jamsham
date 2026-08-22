@@ -9,12 +9,13 @@ interface LobbyProps {
 }
 
 const INSTRUMENT_SHOWCASE = [
-  { name: 'Acoustic Drums', color: '#FF5722', icon: '🥁' },
-  { name: 'Acoustic / Electric Guitar', color: '#FF9800', icon: '🎸' },
-  { name: 'Electric Bass', color: '#E040FB', icon: '🎸' },
-  { name: 'Grand Piano', color: '#00E676', icon: '🎹' },
-  { name: 'Saxophone & Horns', color: '#FFD600', icon: '🎷' },
-  { name: 'String Section', color: '#00B0FF', icon: '🎻' },
+  { name: 'Guitar', color: '#FF9800', icon: '🎸' },
+  { name: 'Keyboard', color: '#00E676', icon: '🎹' },
+  { name: 'Drum Kit', color: '#FF5722', icon: '🥁' },
+  { name: 'Classical Sitar', color: '#E040FB', icon: '🪕' },
+  { name: 'Bansuri Flute', color: '#00B0FF', icon: '🪈' },
+  { name: 'Brass Trumpet', color: '#FFD600', icon: '🎺' },
+  { name: 'Saxophone', color: '#AB47BC', icon: '🎷' },
 ];
 
 function generateUniqueSessionKey(): string {

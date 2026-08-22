@@ -11,16 +11,16 @@ interface RecordParticipantData {
 }
 
 const INSTRUMENT_EMOJIS: Record<string, string> = {
-  PIANO: '🎹',
-  LEAD: '🎹',
-  HORN: '🎺',
-  BRASS: '🎺',
   GUITAR: '🎸',
-  SAX: '🎷',
+  KEYBOARD: '🎹',
+  DRUM: '🥁',
   DRUMS: '🥁',
-  BASS: '🎸',
-  STRINGS: '🎻',
-  PAD: '🌊',
+  SITAR: '🪕',
+  FLUTE: '🪈',
+  TRUMPET: '🎺',
+  SAXOPHONE: '🎷',
+  SAX: '🎷',
+  PIANO: '🎹',
 };
 
 export class VideoSessionRecorder {

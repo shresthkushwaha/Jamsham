@@ -14,35 +14,29 @@ interface PlayerOrbProps {
 }
 
 const INSTRUMENT_ICONS: Record<string, string> = {
-  LEAD: '🎹',
-  PIANO: '🎹',
-  KEYBOARD: '🎹',
   GUITAR: '🎸',
-  BASS: '🎸',
-  STRINGS: '🎻',
-  BRASS: '🎺',
-  HORN: '🎺',
-  TRUMPET: '🎺',
-  SAX: '🎷',
-  SAXOPHONE: '🎷',
+  KEYBOARD: '🎹',
+  DRUM: '🥁',
   DRUMS: '🥁',
-  PAD: '🌊',
-  FX: '✨',
+  SITAR: '🪕',
+  FLUTE: '🪈',
+  TRUMPET: '🎺',
+  SAXOPHONE: '🎷',
+  SAX: '🎷',
+  PIANO: '🎹',
 };
 
 const INSTRUMENT_COLORS: Record<string, string> = {
-  PIANO: '#9C27B0',
-  LEAD: '#9C27B0',
-  KEYBOARD: '#9C27B0',
-  HORN: '#D32F2F',
-  BRASS: '#D32F2F',
-  TRUMPET: '#D32F2F',
-  GUITAR: '#388E3C',
-  STRINGS: '#388E3C',
-  SAX: '#FBC02D',
-  SAXOPHONE: '#FBC02D',
-  BASS: '#7B1FA2',
-  DRUMS: '#00ACC1',
+  GUITAR: '#FF9800',
+  KEYBOARD: '#00E676',
+  DRUM: '#FF5722',
+  DRUMS: '#FF5722',
+  SITAR: '#E040FB',
+  FLUTE: '#00B0FF',
+  TRUMPET: '#FFD600',
+  SAXOPHONE: '#AB47BC',
+  SAX: '#AB47BC',
+  PIANO: '#00E676',
 };
 
 export default function PlayerOrb({

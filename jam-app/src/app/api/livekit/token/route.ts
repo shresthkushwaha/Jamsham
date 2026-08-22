@@ -6,14 +6,13 @@ const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'APIug6WiJ8PstJm';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'eJfuxGowbQmvVXJRXGUaX7uA63GvjLSoElFaqvxdOZy';
 
 const INSTRUMENT_POOL = [
-  { id: 'DRUMS', name: 'Acoustic Drums', color: '#FF5722', role: 'Rhythm & Beats' },
-  { id: 'BASS', name: 'Electric Bass Guitar', color: '#E040FB', role: 'Groove & Low End' },
-  { id: 'PIANO', name: 'Grand Piano', color: '#00E676', role: 'Melody & Harmony' },
-  { id: 'GUITAR', name: 'Electric / Acoustic Guitar', color: '#FF9800', role: 'Chords & Riffs' },
-  { id: 'SAX', name: 'Saxophone & Horns', color: '#FFD600', role: 'Soulful Leads & Stabs' },
-  { id: 'STRINGS', name: 'String Section', color: '#00B0FF', role: 'Violin & Cello Swells' },
-  { id: 'PAD', name: 'Ambient Synth Pad', color: '#26A69A', role: 'Atmospheric Chords' },
-  { id: 'LEAD', name: 'Synth Lead & Keys', color: '#AB47BC', role: 'Electronic Melodies' },
+  { id: 'GUITAR', name: 'Guitar', color: '#FF9800', role: 'Chords & Riffs', icon: '🎸' },
+  { id: 'KEYBOARD', name: 'Keyboard', color: '#00E676', role: 'Melody & Harmony', icon: '🎹' },
+  { id: 'DRUM', name: 'Drum Kit', color: '#FF5722', role: 'Rhythm & Beats', icon: '🥁' },
+  { id: 'SITAR', name: 'Sitar', color: '#E040FB', role: 'Classical Melodies & Ragas', icon: '🪕' },
+  { id: 'FLUTE', name: 'Flute', color: '#00B0FF', role: 'Air & Woodwind Solos', icon: '🪈' },
+  { id: 'TRUMPET', name: 'Trumpet', color: '#FFD600', role: 'Bright Brass & Horn Stabs', icon: '🎺' },
+  { id: 'SAXOPHONE', name: 'Saxophone', color: '#AB47BC', role: 'Soulful Leads & Stabs', icon: '🎷' },
 ];
 
 export async function POST(req: NextRequest) {
