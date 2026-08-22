@@ -1,7 +1,7 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { audioEngine } from '@/lib/audioEngine';
-import { WebRTCManager, User, NoteEvent } from '@/lib/webrtcManager';
+import { LiveKitManager, User, NoteEvent } from '@/lib/livekitManager';
 import Lobby from '@/components/Lobby';
 import MinimalHeader from '@/components/stage/MinimalHeader';
 import BubbleStage from '@/components/stage/BubbleStage';
@@ -26,7 +26,7 @@ export default function JamRoomPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
 
-  const webrtcRef = useRef<WebRTCManager | null>(null);
+  const livekitRef = useRef<LiveKitManager | null>(null);
 
   const handleUnlockAudio = async () => {
     await audioEngine.resume();
@@ -37,8 +37,8 @@ export default function JamRoomPage() {
     setIsLoading(true);
     try {
       await audioEngine.init();
-      const manager = new WebRTCManager();
-      webrtcRef.current = manager;
+      const manager = new LiveKitManager();
+      livekitRef.current = manager;
 
       manager.onUserJoined = (_newUser, allUsers) => setUsers(allUsers);
       manager.onUserLeft = (leftSocketId, remainingUsers) => {
@@ -78,11 +78,6 @@ export default function JamRoomPage() {
           [event.fromSocketId!]: (prev[event.fromSocketId!] || []).filter((n) => !notes.includes(n)),
         }));
       };
-      manager.onMediaUpdated = (socketId, muted, vidOff) => {
-        setUsers((prev) =>
-          prev.map((u) => (u.socketId === socketId ? { ...u, isMuted: muted, isVideoOff: vidOff } : u))
-        );
-      };
       manager.onBpmUpdated = (newBpm) => setBpm(newBpm);
       manager.onVolumeLevels = (levels) => setVolumeLevels(levels);
 
@@ -95,27 +90,28 @@ export default function JamRoomPage() {
       setLocalStream(manager.getLocalStream());
       setIsInRoom(true);
     } catch (err) {
-      console.error('[JamRoom] Failed to join:', err);
+      console.error('[JamRoom] Failed to join via LiveKit:', err);
+      alert('Failed to connect to room. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleToggleMute = () => {
+  const handleToggleMute = async () => {
     const next = !isMuted;
     setIsMuted(next);
-    webrtcRef.current?.toggleMute(next);
+    await livekitRef.current?.toggleMute(next);
   };
 
-  const handleToggleVideo = () => {
+  const handleToggleVideo = async () => {
     const next = !isVideoOff;
     setIsVideoOff(next);
-    webrtcRef.current?.toggleVideo(next);
+    await livekitRef.current?.toggleVideo(next);
   };
 
   const handleBpmChange = (newBpm: number) => {
     setBpm(newBpm);
-    webrtcRef.current?.setBpm(newBpm);
+    livekitRef.current?.setBpm(newBpm);
   };
 
   const handleToggleRecord = async () => {
@@ -175,8 +171,8 @@ export default function JamRoomPage() {
 
   const handleLeave = () => {
     if (isRecording) videoSessionRecorder.stop();
-    webrtcRef.current?.disconnect();
-    webrtcRef.current = null;
+    livekitRef.current?.disconnect();
+    livekitRef.current = null;
     setIsInRoom(false);
     setUsers([]);
     setRemoteStreams(new Map());
@@ -194,7 +190,7 @@ export default function JamRoomPage() {
       ...prev,
       [localUser.socketId]: [...new Set([...(prev[localUser.socketId] || []), ...notesArr])],
     }));
-    webrtcRef.current?.emitNotePlay({ instrument: localUser.instrument?.id || 'PIANO', note, duration: '8n', velocity: 90 });
+    livekitRef.current?.emitNotePlay({ instrument: localUser.instrument?.id || 'PIANO', note, duration: '8n', velocity: 90 });
   };
 
   const handleNoteStop = (note: string | string[]) => {
@@ -204,7 +200,7 @@ export default function JamRoomPage() {
       ...prev,
       [localUser.socketId]: (prev[localUser.socketId] || []).filter((n) => !notesArr.includes(n)),
     }));
-    webrtcRef.current?.emitNoteStop({ instrument: localUser.instrument?.id || 'PIANO', note });
+    livekitRef.current?.emitNoteStop({ instrument: localUser.instrument?.id || 'PIANO', note });
   };
 
   if (!isInRoom) {
@@ -213,19 +209,27 @@ export default function JamRoomPage() {
 
   return (
     <div style={pureMainFrameStyle} onClick={!audioUnlocked ? handleUnlockAudio : undefined}>
-      {/* Audio Unlock Overlay — browsers block audio until a user gesture */}
+      {/* Audio Unlock Overlay */}
       {!audioUnlocked && (
         <div
           onClick={handleUnlockAudio}
           style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
           }}
         >
           <div style={{ fontSize: '52px', marginBottom: '16px' }}>🔊</div>
-          <div style={{ fontSize: '22px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>Tap to Enable Audio</div>
+          <div style={{ fontSize: '22px', fontWeight: 800, color: '#fff', marginBottom: '8px' }}>
+            Tap to Enable Audio
+          </div>
           <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', maxWidth: '280px' }}>
             Browsers require a tap before playing audio.<br />Tap anywhere to enter the stage with full sound.
           </div>
