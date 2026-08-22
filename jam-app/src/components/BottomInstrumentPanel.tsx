@@ -224,12 +224,16 @@ export default function BottomInstrumentPanel({
     };
   }, [localPressed, instrumentId]);
 
+  const normalizedInst = (instrumentId || '').toUpperCase();
+  const isDrum = normalizedInst.includes('DRUM');
+  const isGuitarOrBass = normalizedInst.includes('GUITAR') || normalizedInst.includes('BASS');
+
   return (
     <div style={panelWrapperStyle}>
       <div style={{ width: '100%', height: '100%', display: 'flex', gap: '12px', alignItems: 'center' }}>
         {/* Instrument Surface Area */}
         <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
-          {instrumentId?.toUpperCase() === 'DRUMS' || instrumentId?.toUpperCase() === 'DRUM' ? (
+          {isDrum ? (
             // FIGMA DRUM ROW INSTANCE (Scaled & Colored to Match Video Circle Stroke)
             <div style={figmaDrumWrapper}>
               <div style={figmaDrumRow}>
@@ -260,7 +264,7 @@ export default function BottomInstrumentPanel({
                 })}
               </div>
             </div>
-          ) : instrumentId === 'GUITAR' || instrumentId === 'BASS' ? (
+          ) : isGuitarOrBass ? (
             // SOUNDTRAP GUITAR CHORD SEQUENCER (Screenshot Recreation)
             <div style={soundtrapGuitarWrapper}>
               {/* Top Control Bar */}
