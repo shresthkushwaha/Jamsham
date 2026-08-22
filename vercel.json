@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build --prefix jam-app",
+  "buildCommand": "npm run build --workspace=jam-app",
   "outputDirectory": "jam-app/.next",
   "framework": "nextjs"
 }
