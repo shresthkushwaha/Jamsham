@@ -29,10 +29,10 @@ function generateUniqueSessionKey(): string {
 export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: LobbyProps) {
   const [mode, setMode] = useState<'create' | 'join'>('create');
   const [userName, setUserName] = useState('');
-  const [createdRoomId, setCreatedRoomId] = useState(generateUniqueSessionKey());
+  const [createdRoomId, setCreatedRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
 
-  // Check URL query parameters for invite link (e.g. ?room=xyz)
+  // Check URL query parameters for invite link and generate client-safe unique key
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -40,8 +40,8 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
       if (urlRoom) {
         setJoinRoomId(urlRoom);
         setMode('join');
-      } else if (defaultRoomId) {
-        setCreatedRoomId(defaultRoomId);
+      } else {
+        setCreatedRoomId(defaultRoomId || generateUniqueSessionKey());
       }
     }
   }, [defaultRoomId]);
@@ -131,7 +131,7 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
               </div>
 
               <div style={keyDisplayContainer}>
-                <span style={keyDisplayCode}>Code- {createdRoomId}</span>
+                <span style={keyDisplayCode}>Code- {createdRoomId || '...'}</span>
                 <span style={adminTagStyle}>
                   <ShieldCheck size={12} /> You will be Admin
                 </span>
