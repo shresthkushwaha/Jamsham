@@ -362,6 +362,7 @@ export class WebRTCManager {
   private async createOfferForPeer(peerSocketId: string, iceRestart = false) {
     const pc = this.createPeerConnection(peerSocketId);
     try {
+      if (pc.signalingState !== 'stable') return;
       const offer = await pc.createOffer({ iceRestart });
       await pc.setLocalDescription(offer);
 
@@ -377,8 +378,20 @@ export class WebRTCManager {
 
   private async handleOffer(peerSocketId: string, offer: RTCSessionDescriptionInit) {
     const pc = this.createPeerConnection(peerSocketId);
+    const isPolite = (this.localUser?.socketId || '') > peerSocketId;
 
     try {
+      // Handle signaling collision (WebRTC Glare) gracefully
+      const isCollision = pc.signalingState !== 'stable';
+      if (isCollision) {
+        if (!isPolite) {
+          // Impolite peer ignores incoming offer; its own offer takes precedence
+          return;
+        }
+        // Polite peer rolls back local description to accept the remote offer
+        await pc.setLocalDescription({ type: 'rollback' } as any);
+      }
+
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
       const queued = this.candidateQueue.get(peerSocketId) || [];
@@ -408,17 +421,19 @@ export class WebRTCManager {
     const pc = this.peerConnections.get(peerSocketId);
     if (pc) {
       try {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        if (pc.signalingState === 'have-local-offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
-        const queued = this.candidateQueue.get(peerSocketId) || [];
-        for (const cand of queued) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(cand));
-          } catch (e) {
-            console.warn('[WebRTC] Flush candidate error:', e);
+          const queued = this.candidateQueue.get(peerSocketId) || [];
+          for (const cand of queued) {
+            try {
+              await pc.addIceCandidate(new RTCIceCandidate(cand));
+            } catch (e) {
+              console.warn('[WebRTC] Flush candidate error:', e);
+            }
           }
+          this.candidateQueue.delete(peerSocketId);
         }
-        this.candidateQueue.delete(peerSocketId);
       } catch (e) {
         console.error('[WebRTC] Handle answer error:', e);
       }
