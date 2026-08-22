@@ -69,6 +69,21 @@ export default function PlayerOrb({
   });
 
   const displaySize = defaultSize ? Math.round(defaultSize) : 220;
+  const [trackVersion, setTrackVersion] = React.useState(0);
+
+  useEffect(() => {
+    if (!stream) return;
+    const handleTrackChange = () => setTrackVersion((v) => v + 1);
+
+    stream.addEventListener('addtrack', handleTrackChange);
+    stream.addEventListener('removetrack', handleTrackChange);
+    handleTrackChange();
+
+    return () => {
+      stream.removeEventListener('addtrack', handleTrackChange);
+      stream.removeEventListener('removetrack', handleTrackChange);
+    };
+  }, [stream]);
 
   useEffect(() => {
     if (stream) {
@@ -84,9 +99,9 @@ export default function PlayerOrb({
         });
       }
     }
-  }, [stream, isLocal]);
+  }, [stream, isLocal, trackVersion]);
 
-  const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled && !user.isVideoOff;
+  const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks().some((t) => t.enabled) && !user.isVideoOff;
   const isSpeaking = volume > 8;
   const volNorm = Math.min(1, volume / 75);
 
