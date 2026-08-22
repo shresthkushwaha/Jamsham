@@ -1,0 +1,16 @@
+{
+  "name": "jamsham-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix jam-app",
+    "build": "npm run build --prefix jam-app",
+    "start": "npm run start --prefix jam-app",
+    "server": "npm start --prefix server",
+    "dev:server": "npm run dev --prefix server",
+    "dev:all": "npx concurrently \"npm run server\" \"npm run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

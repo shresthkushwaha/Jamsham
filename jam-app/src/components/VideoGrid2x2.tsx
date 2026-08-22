@@ -41,6 +41,7 @@ function VideoSlot({
 
   return (
     <div
+      className="skeuo-rack-chassis"
       style={{
         ...slotContainerStyle,
         borderColor: isSpeaking
@@ -49,31 +50,29 @@ function VideoSlot({
           ? user.instrument?.color || '#FF5722'
           : 'rgba(255, 255, 255, 0.12)',
         boxShadow: isSpeaking
-          ? '0 0 20px rgba(0, 230, 118, 0.35)'
+          ? '0 0 24px rgba(0, 230, 118, 0.4), inset 0 1px 0 rgba(255,255,255,0.2)'
           : activeNotes.length > 0
-          ? `0 0 25px ${user.instrument?.color || '#FF5722'}66`
-          : 'none',
+          ? `0 0 28px ${user.instrument?.color || '#FF5722'}77`
+          : '0 6px 16px rgba(0,0,0,0.6)',
       }}
     >
-      {/* Header Bar matching ASCII */}
+      {/* Corner Rivet Screws */}
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 5, left: 5 }} />
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 5, right: 5 }} />
+
+      {/* Header Bar matching ASCII: VIDEO 1: YOU (Host) [DRUMS] */}
       <div style={slotHeaderStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={slotLabelStyle}>
-            VIDEO {slotNumber}: {isLocal ? `${user.userName} (YOU/Host)` : user.userName}
+            CH {slotNumber}: {isLocal ? `${user.userName} (YOU)` : user.userName}
           </span>
         </div>
 
         <div style={headerRightGroup}>
-          <span
-            style={{
-              ...instBadgeStyle,
-              borderColor: user.instrument?.color || '#00E676',
-              color: user.instrument?.color || '#00E676',
-              background: `${user.instrument?.color || '#00E676'}18`,
-            }}
-          >
-            [{user.instrument?.name?.toUpperCase() || 'MUSICIAN'}]
-          </span>
+          <div className="skeuo-dymo-tape" style={{ borderColor: user.instrument?.color || '#00E676' }}>
+            <span style={{ color: user.instrument?.color || '#00E676' }}>●</span>
+            <span>{user.instrument?.name?.toUpperCase() || 'MUSICIAN'}</span>
+          </div>
 
           <div style={{ display: 'flex', gap: '4px', marginLeft: '6px' }}>
             {user.isMuted ? <MicOff size={12} color="#FF5252" /> : <Mic size={12} color="#00E676" />}
@@ -82,7 +81,7 @@ function VideoSlot({
         </div>
       </div>
 
-      {/* Video Stream Area */}
+      {/* Video Monitor Area (Broadcast Monitor Glass) */}
       <div style={videoWrapperStyle}>
         {hasVideo ? (
           <video
@@ -97,32 +96,46 @@ function VideoSlot({
             <div
               style={{
                 ...avatarCircle,
-                background: `linear-gradient(135deg, ${user.instrument?.color || '#333'} 0%, #101018 100%)`,
+                background: `radial-gradient(circle at 35% 35%, ${user.instrument?.color || '#444'} 0%, #151520 100%)`,
               }}
             >
-              <Music size={24} color="#fff" />
+              <Music size={26} color="#fff" />
             </div>
-            <span style={{ fontSize: '11px', color: '#777', marginTop: '6px' }}>Camera Disabled</span>
+            <span style={{ fontSize: '10px', color: '#888', marginTop: '6px', letterSpacing: '0.5px' }}>
+              VIDEO FEED STANDBY
+            </span>
           </div>
         )}
 
         {/* Live Active Note Pop */}
         {activeNotes.length > 0 && (
-          <div style={activeNoteTag}>
-            <span>🎵 {activeNotes.join(', ')}</span>
+          <div className="skeuo-dymo-tape" style={activeNoteTag}>
+            <span style={{ color: '#00E676' }}>▶ {activeNotes.join(', ')}</span>
           </div>
         )}
       </div>
 
-      {/* Real-time VU Meter Bar matching ASCII: "VU: ||||||||||||||||" */}
-      <div style={vuMeterRowStyle}>
-        <span style={vuLabelStyle}>VU:</span>
+      {/* Skeuomorphic Analog Amber Backlit VU Meter: "VU: ||||||||||||||||" */}
+      <div className="skeuo-vu-casing" style={vuMeterRowStyle}>
+        <span style={vuLabelStyle}>VU -dB</span>
         <div style={vuMeterTrack}>
+          {/* Amber needle scale ticks */}
+          <div style={vuTicksContainer}>
+            {[-20, -10, -7, -3, 0, '+3'].map((db, idx) => (
+              <span key={idx} style={{ fontSize: '7px', color: idx >= 4 ? '#FF5252' : '#d49b29' }}>
+                {db}
+              </span>
+            ))}
+          </div>
+          {/* Active bouncing VU bar */}
           <div
             style={{
               ...vuMeterBar,
               width: `${Math.min(100, volume * 1.5)}%`,
-              background: volume > 60 ? '#FF5252' : volume > 30 ? '#FFD600' : '#00E676',
+              background:
+                volume > 70
+                  ? 'linear-gradient(90deg, #d49b29 0%, #ff5252 100%)'
+                  : 'linear-gradient(90deg, #b8861d 0%, #e0ac38 100%)',
             }}
           />
         </div>
@@ -133,22 +146,29 @@ function VideoSlot({
 
 function EmptySlot({ slotNumber, onInvite }: { slotNumber: number; onInvite?: () => void }) {
   return (
-    <div style={emptySlotContainer}>
+    <div className="skeuo-rack-chassis" style={emptySlotContainer}>
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 5, left: 5 }} />
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 5, right: 5 }} />
+
       <div style={emptySlotHeader}>
-        <span style={slotLabelStyle}>VIDEO {slotNumber}: [OPEN SLOT]</span>
-        <span style={{ fontSize: '10px', color: '#666' }}>[OFFLINE]</span>
+        <span style={slotLabelStyle}>CH {slotNumber}: [STANDBY]</span>
+        <div className="skeuo-dymo-tape" style={{ color: '#888' }}>
+          <span>OFFLINE</span>
+        </div>
       </div>
 
       <div style={emptySlotBody}>
-        <UserPlus size={28} color="#444" />
-        <span style={{ fontSize: '12px', color: '#777', marginTop: '8px' }}>Waiting for bandmate...</span>
-        <button onClick={onInvite} style={inviteBtnStyle}>
-          Invite Musician
+        <UserPlus size={24} color="#555" />
+        <span style={{ fontSize: '11px', color: '#777', marginTop: '6px', fontWeight: 600 }}>
+          Slot ready for bandmate
+        </span>
+        <button onClick={onInvite} className="skeuo-industrial-btn" style={inviteBtnStyle}>
+          + Copy Invite
         </button>
       </div>
 
-      <div style={vuMeterRowStyle}>
-        <span style={vuLabelStyle}>VU:</span>
+      <div className="skeuo-vu-casing" style={vuMeterRowStyle}>
+        <span style={vuLabelStyle}>VU -dB</span>
         <div style={vuMeterTrack} />
       </div>
     </div>
@@ -164,7 +184,6 @@ export default function VideoGrid2x2({
   activeNotesByUser,
   onInvite,
 }: VideoGrid2x2Props) {
-  // Construct 4 slots (local user is always slot 1, peers occupy 2, 3, 4)
   const slots: (User | null)[] = [localUser, null, null, null];
 
   const remoteUsers = users.filter((u) => u.socketId !== localUser?.socketId);
@@ -212,30 +231,27 @@ const grid2x2Container: React.CSSProperties = {
 };
 
 const slotContainerStyle: React.CSSProperties = {
-  background: '#12121c',
-  borderRadius: '12px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
-  transition: 'all 0.12s ease',
+  position: 'relative',
+  padding: '6px',
 };
 
 const slotHeaderStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '6px 10px',
-  background: 'rgba(0, 0, 0, 0.4)',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+  padding: '4px 8px 4px 18px',
+  marginBottom: '4px',
 };
 
 const slotLabelStyle: React.CSSProperties = {
   fontSize: '11px',
-  fontWeight: '700',
-  color: '#eee',
-  letterSpacing: '0.3px',
+  fontWeight: '800',
+  color: '#ddd',
+  letterSpacing: '0.5px',
+  fontFamily: 'monospace',
 };
 
 const headerRightGroup: React.CSSProperties = {
@@ -243,20 +259,14 @@ const headerRightGroup: React.CSSProperties = {
   alignItems: 'center',
 };
 
-const instBadgeStyle: React.CSSProperties = {
-  fontSize: '10px',
-  fontWeight: '800',
-  padding: '2px 6px',
-  borderRadius: '4px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
-};
-
 const videoWrapperStyle: React.CSSProperties = {
   position: 'relative',
   flex: 1,
-  minHeight: '130px',
-  background: '#09090f',
+  minHeight: '120px',
+  background: '#07070b',
+  borderRadius: '6px',
+  border: '2px inset #050508',
+  boxShadow: 'inset 0 0 16px rgba(0,0,0,0.9)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -278,73 +288,81 @@ const avatarFallbackStyle: React.CSSProperties = {
 };
 
 const avatarCircle: React.CSSProperties = {
-  width: '48px',
-  height: '48px',
+  width: '46px',
+  height: '46px',
   borderRadius: '50%',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  border: '1px solid rgba(255, 255, 255, 0.15)',
+  border: '2px solid rgba(255, 255, 255, 0.2)',
+  boxShadow: '0 4px 8px rgba(0,0,0,0.6)',
 };
 
 const activeNoteTag: React.CSSProperties = {
   position: 'absolute',
   bottom: '8px',
   left: '8px',
-  background: 'rgba(0, 0, 0, 0.75)',
-  border: '1px solid #00E676',
-  color: '#00E676',
-  fontSize: '10px',
-  fontWeight: 'bold',
-  padding: '2px 8px',
-  borderRadius: '10px',
-  backdropFilter: 'blur(4px)',
 };
 
 const vuMeterRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  padding: '4px 10px',
+  padding: '4px 8px',
   gap: '8px',
-  background: 'rgba(0, 0, 0, 0.3)',
-  borderTop: '1px solid rgba(255, 255, 255, 0.04)',
+  marginTop: '6px',
 };
 
 const vuLabelStyle: React.CSSProperties = {
-  fontSize: '10px',
-  fontWeight: 'bold',
-  color: '#888',
+  fontSize: '8px',
+  fontWeight: '900',
+  color: '#c28b26',
+  fontFamily: 'monospace',
 };
 
 const vuMeterTrack: React.CSSProperties = {
   flex: 1,
-  height: '5px',
-  background: 'rgba(255, 255, 255, 0.08)',
-  borderRadius: '3px',
+  height: '12px',
+  background: '#120e09',
+  borderRadius: '2px',
   overflow: 'hidden',
+  position: 'relative',
+  border: '1px solid #33240e',
+};
+
+const vuTicksContainer: React.CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  display: 'flex',
+  justifyContent: 'space-between',
+  padding: '0 4px',
+  alignItems: 'center',
+  zIndex: 2,
 };
 
 const vuMeterBar: React.CSSProperties = {
   height: '100%',
   transition: 'width 0.08s ease',
+  boxShadow: '0 0 6px #e0ac38',
 };
 
 const emptySlotContainer: React.CSSProperties = {
-  background: 'rgba(18, 18, 28, 0.4)',
-  borderRadius: '12px',
-  border: '1px dashed rgba(255, 255, 255, 0.1)',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
+  position: 'relative',
+  padding: '6px',
+  opacity: 0.8,
 };
 
 const emptySlotHeader: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '6px 10px',
-  background: 'rgba(0, 0, 0, 0.2)',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
+  padding: '4px 8px 4px 18px',
+  marginBottom: '4px',
 };
 
 const emptySlotBody: React.CSSProperties = {
@@ -353,17 +371,16 @@ const emptySlotBody: React.CSSProperties = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  minHeight: '130px',
+  minHeight: '120px',
+  background: '#07070a',
+  borderRadius: '6px',
+  border: '1px dashed #222230',
 };
 
 const inviteBtnStyle: React.CSSProperties = {
   marginTop: '8px',
-  background: 'rgba(0, 230, 118, 0.15)',
-  border: '1px solid rgba(0, 230, 118, 0.3)',
-  color: '#00E676',
-  fontSize: '11px',
-  fontWeight: 600,
+  fontSize: '10px',
+  fontWeight: 'bold',
   padding: '4px 10px',
-  borderRadius: '6px',
-  cursor: 'pointer',
+  color: '#00E676',
 };

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Mic, MicOff, Sliders, Settings, Video, VideoOff, Volume2, Sparkles } from 'lucide-react';
+import { Mic, MicOff, Sliders, Video, VideoOff } from 'lucide-react';
 import { audioEngine } from '@/lib/audioEngine';
 
 interface BottomInstrumentPanelProps {
@@ -28,10 +28,9 @@ export default function BottomInstrumentPanel({
   onToggleMute,
   onToggleVideo,
 }: BottomInstrumentPanelProps) {
-  const [velocity, setVelocity] = useState(80);
+  const [velocity, setVelocity] = useState(85);
   const [octave, setOctave] = useState(0);
   const [isFilterOn, setIsFilterOn] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [pressedTrigger, setPressedTrigger] = useState<string | null>(null);
 
   const toggleMasterFilter = () => {
@@ -39,27 +38,45 @@ export default function BottomInstrumentPanel({
     setIsFilterOn(newState);
   };
 
-  // Get keys/pads for current instrument
   const getInstrumentPads = () => {
-    switch (instrumentId) {
+    switch (instrumentId?.toUpperCase()) {
       case 'DRUMS':
         return [
           { id: 'KICK', label: 'KICK', key: '1' },
           { id: 'SNARE', label: 'SNARE', key: '2' },
-          { id: 'HIHAT', label: 'HI-HAT', key: '3' },
-          { id: 'TOM 1', label: 'TOM 1', key: 'Q' },
-          { id: 'TOM 2', label: 'TOM 2', key: 'W' },
-          { id: 'CRASH', label: 'CRASH', key: 'E' },
-          { id: 'CLAP', label: 'CLAP', key: 'A' },
-          { id: 'SHAKER', label: 'SHAKER', key: 'S' },
-          { id: 'COWBELL', label: 'COWBELL', key: 'D' },
+          { id: 'HIHAT', label: 'CL-HAT', key: '3' },
+          { id: 'OPEN HAT', label: 'OP-HAT', key: '4' },
+          { id: 'HIGH TOM', label: 'HI-TOM', key: 'Q' },
+          { id: 'MID TOM', label: 'MID-TOM', key: 'W' },
+          { id: 'FLOOR TOM', label: 'FL-TOM', key: 'E' },
+          { id: 'CRASH', label: 'CRASH', key: 'A' },
+          { id: 'RIDE', label: 'RIDE', key: 'S' },
+          { id: 'TAMBOURINE', label: 'TAMB', key: 'D' },
         ];
+
+      case 'GUITAR':
+        return [
+          { id: 'E Maj', label: 'E MAJ', key: '1', notes: ['E2', 'B2', 'E3', 'G#3', 'B3', 'E4'] },
+          { id: 'A Maj', label: 'A MAJ', key: '2', notes: ['A2', 'E3', 'A3', 'C#4', 'E4'] },
+          { id: 'D Maj', label: 'D MAJ', key: '3', notes: ['D3', 'A3', 'D4', 'F#4'] },
+          { id: 'G Maj', label: 'G MAJ', key: '4', notes: ['G2', 'B2', 'D3', 'G3', 'B3', 'G4'] },
+          { id: 'C Maj', label: 'C MAJ', key: '5', notes: ['C3', 'E3', 'G3', 'C4', 'E4'] },
+          { id: 'E Min', label: 'E MIN', key: 'Q', notes: ['E2', 'B2', 'E3', 'G3', 'B3', 'E4'] },
+          { id: 'A Min', label: 'A MIN', key: 'W', notes: ['A2', 'E3', 'A3', 'C4', 'E4'] },
+          { id: 'D Min', label: 'D MIN', key: 'E', notes: ['D3', 'A3', 'D4', 'F4'] },
+          { id: 'E4', label: 'E4-PLK', key: 'A', notes: 'E4' },
+          { id: 'B3', label: 'B3-PLK', key: 'S', notes: 'B3' },
+          { id: 'G3', label: 'G3-PLK', key: 'D', notes: 'G3' },
+        ];
+
       case 'BASS':
-        return ['C1', 'D1', 'E1', 'F1', 'G1', 'A1', 'B1', 'C2', 'D2', 'E2'].map((note, idx) => {
+        return ['E1', 'F1', 'G1', 'A1', 'B1', 'C2', 'D2', 'E2', 'F2', 'G2'].map((note, idx) => {
           const shiftNote = `${note.slice(0, -1)}${parseInt(note.slice(-1)) + octave}`;
           const keys = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';'];
           return { id: shiftNote, label: shiftNote, key: keys[idx] || `${idx + 1}` };
         });
+
+      case 'PIANO':
       case 'LEAD':
         return [
           { id: 'C4', label: 'C4', key: 'A' },
@@ -76,24 +93,31 @@ export default function BottomInstrumentPanel({
           { id: 'B4', label: 'B4', key: 'J' },
           { id: 'C5', label: 'C5', key: 'K' },
         ];
-      case 'PAD':
+
+      case 'BRASS':
         return [
-          { id: 'Am9', label: 'Am9', key: '1', notes: ['A3', 'C4', 'E4', 'G4', 'B4'] },
-          { id: 'Fmaj7', label: 'Fmaj7', key: '2', notes: ['F3', 'A3', 'C4', 'E4'] },
-          { id: 'Cmaj9', label: 'Cmaj9', key: '3', notes: ['C3', 'E3', 'G3', 'B3', 'D4'] },
-          { id: 'G6/9', label: 'G6/9', key: '4', notes: ['G3', 'B3', 'D4', 'E4', 'A4'] },
-          { id: 'Dm7', label: 'Dm7', key: '5', notes: ['D3', 'F3', 'A3', 'C4'] },
-          { id: 'Em11', label: 'Em11', key: '6', notes: ['E3', 'G3', 'B3', 'D4', 'A4'] },
+          { id: 'Bb3', label: 'Bb3 SAX', key: '1' },
+          { id: 'C4', label: 'C4 STAB', key: '2' },
+          { id: 'D4', label: 'D4 STAB', key: '3' },
+          { id: 'F4', label: 'F4 HORN', key: '4' },
+          { id: 'G4', label: 'G4 HORN', key: '5' },
+          { id: 'Bb4', label: 'Bb4 SAX', key: 'Q' },
+          { id: 'C5', label: 'C5 TRP', key: 'W' },
+          { id: 'D5', label: 'D5 TRP', key: 'E' },
         ];
-      case 'FX':
+
+      case 'STRINGS':
+      case 'PAD':
       default:
         return [
-          { id: 'LASER', label: '⚡ LASER', key: '1' },
-          { id: 'ZAP', label: '✨ ZAP', key: '2' },
-          { id: 'SUB DROP', label: '💥 SUB DROP', key: '3' },
-          { id: 'SWEEP', label: '💨 SWEEP', key: '4' },
-          { id: 'CHIME', label: '🔔 CHIME', key: '5' },
-          { id: 'GLITCH', label: '🤖 GLITCH', key: '6' },
+          { id: 'Am Swell', label: 'Am SWELL', key: '1', notes: ['A3', 'C4', 'E4', 'A4'] },
+          { id: 'F Maj Swell', label: 'F MAJ', key: '2', notes: ['F3', 'A3', 'C4', 'F4'] },
+          { id: 'C Maj Swell', label: 'C MAJ', key: '3', notes: ['C3', 'E3', 'G3', 'C4'] },
+          { id: 'G Maj Swell', label: 'G MAJ', key: '4', notes: ['G3', 'B3', 'D4', 'G4'] },
+          { id: 'Dm Swell', label: 'Dm SWELL', key: '5', notes: ['D3', 'F3', 'A3', 'D4'] },
+          { id: 'Em Swell', label: 'Em SWELL', key: '6', notes: ['E3', 'G3', 'B3', 'E4'] },
+          { id: 'Violin Solo A5', label: 'VIOLIN A5', key: 'Q', notes: 'A5' },
+          { id: 'Cello C2', label: 'CELLO C2', key: 'W', notes: 'C2' },
         ];
     }
   };
@@ -124,46 +148,74 @@ export default function BottomInstrumentPanel({
   }, [pads, velocity, octave]);
 
   return (
-    <footer style={panelContainerStyle}>
+    <footer className="skeuo-rack-chassis" style={panelContainerStyle}>
+      {/* Corner Rivet Screws */}
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 6, left: 6 }} />
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 6, right: 6 }} />
+
       {/* Left: Your Instrument Control Panel */}
       <div style={instrumentSectionStyle}>
         <div style={panelHeaderRow}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>
-              YOUR INSTRUMENT CONTROL PANEL:
+            <span style={{ fontSize: '10px', fontWeight: 800, color: '#777', letterSpacing: '1px' }}>
+              ANALOG CONSOLE:
             </span>
-            <span style={{ ...instTag, color: instrumentColor, borderColor: instrumentColor }}>
-              {instrumentName.toUpperCase()}
-            </span>
+            <div className="skeuo-dymo-tape" style={{ borderColor: instrumentColor }}>
+              <span style={{ color: instrumentColor }}>●</span>
+              <span>{instrumentName.toUpperCase()}</span>
+            </div>
           </div>
 
-          {/* Quick Param Sliders matching ASCII: "Vel: [===|===] Oct: [- 0 +] Decay: [==|====]" */}
+          {/* Skeuomorphic Param Knobs & Controls */}
           <div style={paramControlsRow}>
-            <div style={sliderGroup}>
-              <span style={sliderLabel}>Vel:</span>
-              <input
-                type="range"
-                min="20"
-                max="100"
-                value={velocity}
-                onChange={(e) => setVelocity(parseInt(e.target.value))}
-                style={rangeInput}
-              />
-              <span style={sliderVal}>{velocity}%</span>
+            {/* Velocity Knurled Knob */}
+            <div style={knobWrapper}>
+              <div
+                className="skeuo-knob"
+                title={`Velocity: ${velocity}%`}
+                onClick={() => setVelocity((v) => (v >= 100 ? 40 : v + 20))}
+                style={{ cursor: 'pointer' }}
+              >
+                <div
+                  className="skeuo-knob-indicator"
+                  style={{ transform: `rotate(${(velocity - 60) * 2.5}deg)` }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#888' }}>VEL</span>
+                <span className="skeuo-digital-led" style={{ fontSize: '10px', color: '#00E676' }}>
+                  {velocity}
+                </span>
+              </div>
             </div>
 
-            <div style={octaveGroup}>
-              <span style={sliderLabel}>Oct:</span>
-              <button onClick={() => setOctave((o) => Math.max(-1, o - 1))} style={octBtn}>-</button>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#00E676', minWidth: '14px', textAlign: 'center' }}>
-                {octave >= 0 ? `+${octave}` : octave}
-              </span>
-              <button onClick={() => setOctave((o) => Math.min(1, o + 1))} style={octBtn}>+</button>
+            {/* Octave Step Selector */}
+            <div style={octaveSkeuoBox}>
+              <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#888' }}>OCTAVE</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <button
+                  onClick={() => setOctave((o) => Math.max(-1, o - 1))}
+                  className="skeuo-industrial-btn"
+                  style={octStepBtn}
+                >
+                  -
+                </button>
+                <span className="skeuo-digital-led" style={{ fontSize: '11px', color: '#FFD600', minWidth: '22px', textAlign: 'center' }}>
+                  {octave >= 0 ? `+${octave}` : octave}
+                </span>
+                <button
+                  onClick={() => setOctave((o) => Math.min(1, o + 1))}
+                  className="skeuo-industrial-btn"
+                  style={octStepBtn}
+                >
+                  +
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Dynamic Buttons / Trigger Strip */}
+        {/* 3D MPC Drum / Guitar / Piano Trigger Pads */}
         <div style={padsRowStyle}>
           {pads.map((item: any) => {
             const isHit = pressedTrigger === item.id || activeNotes.includes(item.id);
@@ -171,20 +223,29 @@ export default function BottomInstrumentPanel({
               <button
                 key={item.id}
                 onClick={() => handlePadHit(item)}
+                className="skeuo-mpc-pad"
                 style={{
                   ...padBtnStyle,
                   background: isHit
-                    ? `radial-gradient(circle, ${instrumentColor} 0%, #1c1c28 100%)`
+                    ? `radial-gradient(circle at 50% 30%, ${instrumentColor} 0%, #1c1c28 100%)`
                     : item.isBlack
-                    ? '#0a0a12'
-                    : '#151522',
-                  borderColor: isHit ? instrumentColor : item.isBlack ? '#333' : 'rgba(255, 255, 255, 0.12)',
-                  boxShadow: isHit ? `0 0 16px ${instrumentColor}` : 'none',
-                  transform: isHit ? 'scale(0.96)' : 'none',
+                    ? 'linear-gradient(180deg, #181822 0%, #0c0c12 100%)'
+                    : 'linear-gradient(180deg, #323242 0%, #20202c 100%)',
+                  borderColor: isHit ? instrumentColor : item.isBlack ? '#242432' : 'rgba(255, 255, 255, 0.12)',
+                  boxShadow: isHit
+                    ? `0 0 20px ${instrumentColor}, inset 0 2px 6px rgba(0,0,0,0.8)`
+                    : '0 4px 8px rgba(0, 0, 0, 0.6)',
                 }}
               >
                 <span style={keyShortcutBadge}>{item.key}</span>
-                <span style={{ fontSize: '12px', fontWeight: 'bold', color: isHit ? '#fff' : '#eee' }}>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    color: isHit ? '#fff' : item.isBlack ? '#999' : '#eee',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                  }}
+                >
                   {item.label}
                 </span>
               </button>
@@ -193,61 +254,67 @@ export default function BottomInstrumentPanel({
         </div>
       </div>
 
-      {/* Right: 3 Action Buttons matching ASCII: [🎙] MIC MUTE | [🎛] FILTER | [⚙] SETTINGS */}
+      {/* Right: 3 Heavy Duty Skeuomorphic Switches: [🎙] [🎛] [⚙] */}
       <div style={actionsGroupStyle}>
-        {/* 1. MIC MUTE */}
         <button
           onClick={onToggleMute}
+          className="skeuo-industrial-btn"
           style={{
             ...actionBtnStyle,
-            borderColor: isMuted ? '#FF5252' : 'rgba(255, 255, 255, 0.12)',
-            background: isMuted ? 'rgba(255, 82, 82, 0.2)' : '#12121c',
+            borderColor: isMuted ? '#FF5252' : 'rgba(255, 255, 255, 0.18)',
+            background: isMuted
+              ? 'linear-gradient(180deg, #421c1c 0%, #240d0d 100%)'
+              : 'linear-gradient(180deg, #2c3c2e 0%, #162418 100%)',
           }}
-          title="Microphone Toggle"
+          title="Mic Mute Toggle"
         >
           {isMuted ? <MicOff size={18} color="#FF5252" /> : <Mic size={18} color="#00E676" />}
           <div style={actionBtnTextGroup}>
-            <span style={{ fontSize: '10px', color: '#888' }}>[🎙]</span>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: isMuted ? '#FF5252' : '#fff' }}>
-              {isMuted ? 'MUTED' : 'MIC ON'}
+            <span style={{ fontSize: '9px', fontWeight: 900, color: '#aaa' }}>[🎙] MIC</span>
+            <span style={{ fontSize: '10px', fontWeight: 900, color: isMuted ? '#FF5252' : '#00E676' }}>
+              {isMuted ? 'OFF' : 'LIVE'}
             </span>
           </div>
         </button>
 
-        {/* 2. FILTER / FX */}
         <button
           onClick={toggleMasterFilter}
+          className="skeuo-industrial-btn"
           style={{
             ...actionBtnStyle,
-            borderColor: isFilterOn ? '#FFD600' : 'rgba(255, 255, 255, 0.12)',
-            background: isFilterOn ? 'rgba(255, 214, 0, 0.2)' : '#12121c',
+            borderColor: isFilterOn ? '#FFD600' : 'rgba(255, 255, 255, 0.18)',
+            background: isFilterOn
+              ? 'linear-gradient(180deg, #443c1c 0%, #26200c 100%)'
+              : 'linear-gradient(180deg, #323240 0%, #1a1a24 100%)',
           }}
-          title="Master Filter FX Toggle"
+          title="Master Filter On/Off"
         >
-          <Sliders size={18} color={isFilterOn ? '#FFD600' : '#aaa'} />
+          <Sliders size={18} color={isFilterOn ? '#FFD600' : '#888'} />
           <div style={actionBtnTextGroup}>
-            <span style={{ fontSize: '10px', color: '#888' }}>[🎛]</span>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: isFilterOn ? '#FFD600' : '#fff' }}>
-              {isFilterOn ? 'FILT ON' : 'FILTER'}
+            <span style={{ fontSize: '9px', fontWeight: 900, color: '#aaa' }}>[🎛] FILT</span>
+            <span style={{ fontSize: '10px', fontWeight: 900, color: isFilterOn ? '#FFD600' : '#777' }}>
+              {isFilterOn ? 'ON' : 'BYPASS'}
             </span>
           </div>
         </button>
 
-        {/* 3. SETTINGS / CAM */}
         <button
           onClick={onToggleVideo}
+          className="skeuo-industrial-btn"
           style={{
             ...actionBtnStyle,
-            borderColor: isVideoOff ? '#FF5252' : 'rgba(255, 255, 255, 0.12)',
-            background: isVideoOff ? 'rgba(255, 82, 82, 0.2)' : '#12121c',
+            borderColor: isVideoOff ? '#FF5252' : 'rgba(255, 255, 255, 0.18)',
+            background: isVideoOff
+              ? 'linear-gradient(180deg, #421c1c 0%, #240d0d 100%)'
+              : 'linear-gradient(180deg, #1c2c42 0%, #0d1826 100%)',
           }}
           title="Camera Toggle"
         >
           {isVideoOff ? <VideoOff size={18} color="#FF5252" /> : <Video size={18} color="#00B0FF" />}
           <div style={actionBtnTextGroup}>
-            <span style={{ fontSize: '10px', color: '#888' }}>[⚙]</span>
-            <span style={{ fontSize: '11px', fontWeight: 'bold', color: isVideoOff ? '#FF5252' : '#fff' }}>
-              {isVideoOff ? 'CAM OFF' : 'CAMERA'}
+            <span style={{ fontSize: '9px', fontWeight: 900, color: '#aaa' }}>[⚙] CAM</span>
+            <span style={{ fontSize: '10px', fontWeight: 900, color: isVideoOff ? '#FF5252' : '#00B0FF' }}>
+              {isVideoOff ? 'OFF' : 'LIVE'}
             </span>
           </div>
         </button>
@@ -257,14 +324,13 @@ export default function BottomInstrumentPanel({
 }
 
 const panelContainerStyle: React.CSSProperties = {
-  background: '#0d0d14',
-  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-  padding: '12px 16px',
+  padding: '12px 20px',
   display: 'flex',
   gap: '16px',
   alignItems: 'center',
-  height: '110px',
+  height: '118px',
   boxSizing: 'border-box',
+  margin: '0 8px 8px 8px',
 };
 
 const instrumentSectionStyle: React.CSSProperties = {
@@ -280,62 +346,38 @@ const panelHeaderRow: React.CSSProperties = {
   alignItems: 'center',
 };
 
-const instTag: React.CSSProperties = {
-  fontSize: '10px',
-  fontWeight: '800',
-  padding: '1px 6px',
-  borderRadius: '4px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
-};
-
 const paramControlsRow: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '16px',
 };
 
-const sliderGroup: React.CSSProperties = {
+const knobWrapper: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  background: 'rgba(0, 0, 0, 0.35)',
+  padding: '3px 8px',
+  borderRadius: '8px',
+  border: '1px solid rgba(255, 255, 255, 0.06)',
+};
+
+const octaveSkeuoBox: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '6px',
+  background: 'rgba(0, 0, 0, 0.35)',
+  padding: '3px 8px',
+  borderRadius: '8px',
+  border: '1px solid rgba(255, 255, 255, 0.06)',
 };
 
-const sliderLabel: React.CSSProperties = {
-  fontSize: '10px',
+const octStepBtn: React.CSSProperties = {
+  width: '20px',
+  height: '20px',
+  fontSize: '11px',
   fontWeight: 'bold',
-  color: '#888',
-};
-
-const sliderVal: React.CSSProperties = {
-  fontSize: '10px',
-  color: '#aaa',
-  minWidth: '28px',
-};
-
-const rangeInput: React.CSSProperties = {
-  width: '70px',
-  height: '4px',
-  accentColor: '#00E676',
-  cursor: 'pointer',
-};
-
-const octaveGroup: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '4px',
-};
-
-const octBtn: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.08)',
-  border: 'none',
   color: '#fff',
-  width: '16px',
-  height: '16px',
-  borderRadius: '3px',
-  cursor: 'pointer',
-  fontSize: '10px',
-  fontWeight: 'bold',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -350,51 +392,40 @@ const padsRowStyle: React.CSSProperties = {
 
 const padBtnStyle: React.CSSProperties = {
   flex: 1,
-  minWidth: '65px',
-  height: '48px',
-  borderRadius: '8px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
+  minWidth: '70px',
+  height: '52px',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  position: 'relative',
-  cursor: 'pointer',
-  transition: 'all 0.08s ease',
-  outline: 'none',
+  padding: '4px 6px',
 };
 
 const keyShortcutBadge: React.CSSProperties = {
   position: 'absolute',
   top: '3px',
   left: '4px',
-  fontSize: '9px',
-  color: '#666',
-  fontWeight: 'bold',
+  fontSize: '8px',
+  color: '#888',
+  fontWeight: '900',
+  fontFamily: 'monospace',
 };
 
 const actionsGroupStyle: React.CSSProperties = {
   display: 'flex',
-  gap: '8px',
-  borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+  gap: '10px',
+  borderLeft: '2px groove rgba(255, 255, 255, 0.1)',
   paddingLeft: '16px',
 };
 
 const actionBtnStyle: React.CSSProperties = {
-  width: '68px',
-  height: '68px',
-  borderRadius: '10px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
+  width: '66px',
+  height: '66px',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  gap: '4px',
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
-  outline: 'none',
+  gap: '3px',
 };
 
 const actionBtnTextGroup: React.CSSProperties = {

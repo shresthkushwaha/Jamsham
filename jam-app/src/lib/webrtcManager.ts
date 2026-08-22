@@ -11,6 +11,7 @@ export interface User {
     role: string;
     isShared?: boolean;
   };
+  isAdmin?: boolean;
   isMuted?: boolean;
   isVideoOff?: boolean;
 }
@@ -32,12 +33,16 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-const ICE_SERVERS = {
+const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
   ],
+  iceCandidatePoolSize: 10,
 };
 
 export class WebRTCManager {
@@ -46,6 +51,7 @@ export class WebRTCManager {
   private peerConnections: Map<string, RTCPeerConnection> = new Map();
   private remoteStreams: Map<string, MediaStream> = new Map();
   private audioContext: AudioContext | null = null;
+  private analysers: Map<string, AnalyserNode> = new Map();
   private volumeInterval: any = null;
 
   public localUser: User | null = null;
@@ -69,9 +75,9 @@ export class WebRTCManager {
   ): Promise<{ user: User; users: User[]; bpm: number }> {
     this.roomId = roomId;
 
-    // Determine backend URL
     const backendUrl =
       serverUrl ||
+      process.env.NEXT_PUBLIC_JAM_SERVER_URL ||
       (typeof window !== 'undefined'
         ? `${window.location.protocol}//${window.location.hostname}:3001`
         : 'http://localhost:3001');
@@ -85,7 +91,7 @@ export class WebRTCManager {
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
-          noiseSuppression: false, // keep singing natural
+          noiseSuppression: false, // Keep musical resonance
           autoGainControl: true,
         },
         video: {
@@ -95,18 +101,24 @@ export class WebRTCManager {
         },
       });
     } catch (err) {
-      console.warn('[WebRTC] Camera/Mic access declined or unavailable, running in audio-only / simulated mode', err);
-      // Create empty fallback stream so peer connections can still negotiate
+      console.warn('[WebRTC] Camera/Mic access declined or simulated mode', err);
       this.localStream = new MediaStream();
     }
 
     this.setupSocketListeners();
-    this.startVolumeMonitoring();
 
     return new Promise((resolve, reject) => {
       this.socket?.emit('join_room', { roomId, userName }, (res: any) => {
         if (res?.success) {
           this.localUser = res.user;
+
+          // Start audio monitoring for local user
+          if (this.localStream && this.localUser) {
+            this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
+          }
+
+          this.startVolumeMonitoring();
+
           resolve({
             user: res.user,
             users: res.room.users,
@@ -122,20 +134,16 @@ export class WebRTCManager {
   private setupSocketListeners() {
     if (!this.socket) return;
 
-    // Existing user sees a new user join -> create WebRTC Offer
     this.socket.on('user_joined', async ({ user, allUsers }: { user: User; allUsers: User[] }) => {
-      console.log('[WebRTC] New peer joined:', user.userName);
       this.onUserJoined?.(user, allUsers);
       await this.createOfferForPeer(user.socketId);
     });
 
-    // A user left
     this.socket.on('user_left', ({ socketId, remainingUsers }: { socketId: string; remainingUsers: User[] }) => {
       this.closePeer(socketId);
       this.onUserLeft?.(socketId, remainingUsers);
     });
 
-    // WebRTC Signaling
     this.socket.on('webrtc_signal', async ({ fromSocketId, signalType, data }) => {
       if (signalType === 'offer') {
         await this.handleOffer(fromSocketId, data);
@@ -146,7 +154,6 @@ export class WebRTCManager {
       }
     });
 
-    // Remote Note triggers
     this.socket.on('note_play', (event: NoteEvent) => {
       this.onNotePlay?.(event);
     });
@@ -155,17 +162,14 @@ export class WebRTCManager {
       this.onNoteStop?.(event);
     });
 
-    // Media state toggles (mic/video)
     this.socket.on('user_media_updated', ({ socketId, isMuted, isVideoOff }) => {
       this.onMediaUpdated?.(socketId, isMuted, isVideoOff);
     });
 
-    // BPM updates
     this.socket.on('bpm_updated', ({ bpm }: { bpm: number }) => {
       this.onBpmUpdated?.(bpm);
     });
 
-    // Chat messages
     this.socket.on('chat_message', (msg: ChatMessage) => {
       this.onChatMessage?.(msg);
     });
@@ -174,14 +178,12 @@ export class WebRTCManager {
   private createPeerConnection(peerSocketId: string): RTCPeerConnection {
     const pc = new RTCPeerConnection(ICE_SERVERS);
 
-    // Add local tracks to peer connection
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => {
         pc.addTrack(track, this.localStream!);
       });
     }
 
-    // ICE Candidate handler
     pc.onicecandidate = (event) => {
       if (event.candidate && this.socket) {
         this.socket.emit('webrtc_signal', {
@@ -192,10 +194,10 @@ export class WebRTCManager {
       }
     };
 
-    // Remote stream received
     pc.ontrack = (event) => {
       const stream = event.streams[0] || new MediaStream([event.track]);
       this.remoteStreams.set(peerSocketId, stream);
+      this.attachAudioAnalyser(peerSocketId, stream);
       this.onRemoteStream?.(peerSocketId, stream);
     };
 
@@ -270,7 +272,6 @@ export class WebRTCManager {
     return this.remoteStreams.get(socketId);
   }
 
-  // Instrument Note Events
   public emitNotePlay(event: NoteEvent) {
     this.socket?.emit('note_play', event);
   }
@@ -279,7 +280,6 @@ export class WebRTCManager {
     this.socket?.emit('note_stop', event);
   }
 
-  // Media Controls
   public toggleMute(muted: boolean) {
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach((track) => {
@@ -306,44 +306,50 @@ export class WebRTCManager {
     this.socket?.emit('send_chat', { text, userName });
   }
 
-  // Audio level monitoring for VU meters
+  // Attach real-time audio analyser to a stream for microphone reactivity
+  private attachAudioAnalyser(socketId: string, stream: MediaStream) {
+    try {
+      if (!this.audioContext) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        this.audioContext = new AudioCtx();
+      }
+
+      if (stream.getAudioTracks().length > 0) {
+        const source = this.audioContext.createMediaStreamSource(stream);
+        const analyser = this.audioContext.createAnalyser();
+        analyser.fftSize = 64;
+        analyser.smoothingTimeConstant = 0.4;
+        source.connect(analyser);
+        this.analysers.set(socketId, analyser);
+      }
+    } catch (err) {
+      console.warn('[WebRTC] Failed to attach audio analyser for', socketId, err);
+    }
+  }
+
+  // Fast 40ms continuous volume analysis loop
   private startVolumeMonitoring() {
     if (typeof window === 'undefined') return;
 
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      this.audioContext = new AudioCtx();
+    if (this.volumeInterval) clearInterval(this.volumeInterval);
 
-      let localAnalyser: AnalyserNode | null = null;
-      if (this.localStream && this.localStream.getAudioTracks().length > 0) {
-        try {
-          const source = this.audioContext.createMediaStreamSource(this.localStream);
-          localAnalyser = this.audioContext.createAnalyser();
-          localAnalyser.fftSize = 32;
-          source.connect(localAnalyser);
-        } catch {
-          // Ignore
-        }
-      }
+    this.volumeInterval = setInterval(() => {
+      const levels: Record<string, number> = {};
 
-      this.volumeInterval = setInterval(() => {
-        const levels: Record<string, number> = {};
+      this.analysers.forEach((analyser, socketId) => {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length; // 0 to 255
+        // Boost sensitivity for subtle voice talking
+        const normalized = Math.min(100, Math.round((avg / 80) * 100));
+        levels[socketId] = normalized;
+      });
 
-        if (localAnalyser && this.localUser) {
-          const data = new Uint8Array(localAnalyser.frequencyBinCount);
-          localAnalyser.getByteFrequencyData(data);
-          let sum = 0;
-          for (let i = 0; i < data.length; i++) sum += data[i];
-          const avg = sum / data.length;
-          levels[this.localUser.socketId] = Math.min(100, Math.round((avg / 128) * 100));
-        }
-
-        this.onVolumeLevels?.(levels);
-      }, 100);
-    } catch {
-      // Ignore
-    }
+      this.onVolumeLevels?.(levels);
+    }, 40);
   }
 
   private closePeer(socketId: string) {
@@ -352,6 +358,7 @@ export class WebRTCManager {
       pc.close();
       this.peerConnections.delete(socketId);
     }
+    this.analysers.delete(socketId);
     this.remoteStreams.delete(socketId);
   }
 
@@ -359,8 +366,13 @@ export class WebRTCManager {
     if (this.volumeInterval) clearInterval(this.volumeInterval);
     this.peerConnections.forEach((pc) => pc.close());
     this.peerConnections.clear();
+    this.analysers.clear();
     this.remoteStreams.clear();
     this.localStream?.getTracks().forEach((track) => track.stop());
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
     this.socket?.disconnect();
   }
 }

@@ -1,7 +1,12 @@
 node_modules/
 .next/
+jam-app/.next/
+jam-app/node_modules/
+server/node_modules/
 out/
 build/
 dist/
 .DS_Store
 *.log
+.env.local
+.env.*.local

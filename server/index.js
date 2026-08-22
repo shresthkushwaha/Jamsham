@@ -16,20 +16,22 @@ const io = new Server(server, {
 });
 
 const ALL_INSTRUMENTS = [
-  { id: 'DRUMS', name: 'Drum Kit', color: '#FF5722', role: 'Rhythm & Beats' },
-  { id: 'BASS', name: 'Sub Bass', color: '#E040FB', role: 'Groove & Low End' },
-  { id: 'LEAD', name: 'Lead Synth', color: '#00E676', role: 'Melody & Solo' },
-  { id: 'PAD', name: 'Ambient Pad', color: '#00B0FF', role: 'Harmonies & Chords' },
-  { id: 'FX', name: 'FX & Glitch', color: '#FFD600', role: 'Textures & Drops' },
+  { id: 'DRUMS', name: 'Acoustic Drums', color: '#FF5722', role: 'Rhythm & Beats' },
+  { id: 'GUITAR', name: 'Electric / Acoustic Guitar', color: '#FF9800', role: 'Chords & Riffs' },
+  { id: 'BASS', name: 'Electric Bass Guitar', color: '#E040FB', role: 'Groove & Low End' },
+  { id: 'PIANO', name: 'Grand Piano', color: '#00E676', role: 'Melody & Harmony' },
+  { id: 'BRASS', name: 'Saxophone & Horns', color: '#FFD600', role: 'Soulful Leads & Stabs' },
+  { id: 'STRINGS', name: 'String Section', color: '#00B0FF', role: 'Violin & Cello Swells' },
 ];
 
-// Room state storage: roomId -> { id, bpm, isPlaying, users: { [socketId]: userObj } }
+// Room state storage: roomId -> { id, adminSocketId, bpm, isPlaying, users: { [socketId]: userObj } }
 const rooms = new Map();
 
-function getOrCreateRoom(roomId) {
+function getOrCreateRoom(roomId, creatorSocketId) {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       id: roomId,
+      adminSocketId: creatorSocketId,
       bpm: 120,
       isPlaying: true,
       users: {},
@@ -62,13 +64,21 @@ io.on('connection', (socket) => {
     currentRoomId = cleanRoomId;
     socket.join(cleanRoomId);
 
-    const room = getOrCreateRoom(cleanRoomId);
+    const isFirstInRoom = !rooms.has(cleanRoomId) || Object.keys(rooms.get(cleanRoomId).users).length === 0;
+    const room = getOrCreateRoom(cleanRoomId, socket.id);
     const instrument = assignInstrument(room);
+
+    // The person who creates / is first in the session becomes the Admin (Host)
+    const isAdmin = room.adminSocketId === socket.id || isFirstInRoom;
+    if (isFirstInRoom) {
+      room.adminSocketId = socket.id;
+    }
 
     const user = {
       socketId: socket.id,
       userName: userName || `Jammer-${socket.id.slice(0, 4)}`,
       instrument,
+      isAdmin,
       isMuted: false,
       isVideoOff: false,
       joinedAt: Date.now(),
@@ -76,7 +86,7 @@ io.on('connection', (socket) => {
 
     room.users[socket.id] = user;
 
-    console.log(`[User Joined] ${user.userName} (${user.instrument.name}) in room: ${cleanRoomId}`);
+    console.log(`[User Joined] ${user.userName} (${user.instrument.name}) ${isAdmin ? '[ADMIN/HOST]' : ''} in room: ${cleanRoomId}`);
 
     // Notify all existing users in the room that a new peer arrived (initiates WebRTC offer)
     socket.to(cleanRoomId).emit('user_joined', {
@@ -90,6 +100,7 @@ io.on('connection', (socket) => {
         user,
         room: {
           id: room.id,
+          adminSocketId: room.adminSocketId,
           bpm: room.bpm,
           isPlaying: room.isPlaying,
           users: Object.values(room.users),
@@ -143,7 +154,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // BPM / Metronome sync
+  // BPM / Metronome sync (Admin or any participant)
   socket.on('update_bpm', ({ bpm }) => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
@@ -165,7 +176,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle Disconnect
+  // Handle Disconnect & Host Transfer
   const handleLeave = () => {
     if (!currentRoomId) return;
     const room = rooms.get(currentRoomId);
@@ -174,14 +185,24 @@ io.on('connection', (socket) => {
       delete room.users[socket.id];
       console.log(`[User Left] ${departedUser.userName} from ${currentRoomId}`);
 
+      const remainingUsers = Object.values(room.users);
+
+      // If the Admin/Host leaves, seamlessly promote the next participant to Admin
+      if (departedUser.isAdmin && remainingUsers.length > 0) {
+        remainingUsers[0].isAdmin = true;
+        room.adminSocketId = remainingUsers[0].socketId;
+        console.log(`[Admin Transferred] New host: ${remainingUsers[0].userName}`);
+      }
+
       socket.to(currentRoomId).emit('user_left', {
         socketId: socket.id,
         userName: departedUser.userName,
-        remainingUsers: Object.values(room.users),
+        remainingUsers,
+        adminSocketId: room.adminSocketId,
       });
 
       // Clean up empty room
-      if (Object.keys(room.users).length === 0) {
+      if (remainingUsers.length === 0) {
         rooms.delete(currentRoomId);
         console.log(`[Room Closed] ${currentRoomId}`);
       }
