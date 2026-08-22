@@ -17,11 +17,8 @@ const io = new Server(server, {
 
 const ALL_INSTRUMENTS = [
   { id: 'DRUMS', name: 'Acoustic Drums', color: '#FF5722', role: 'Rhythm & Beats' },
-  { id: 'GUITAR', name: 'Electric / Acoustic Guitar', color: '#FF9800', role: 'Chords & Riffs' },
-  { id: 'BASS', name: 'Electric Bass Guitar', color: '#E040FB', role: 'Groove & Low End' },
   { id: 'PIANO', name: 'Grand Piano', color: '#00E676', role: 'Melody & Harmony' },
-  { id: 'BRASS', name: 'Saxophone & Horns', color: '#FFD600', role: 'Soulful Leads & Stabs' },
-  { id: 'STRINGS', name: 'String Section', color: '#00B0FF', role: 'Violin & Cello Swells' },
+  { id: 'BASS', name: 'Electric Bass', color: '#E040FB', role: 'Groove & Low End' },
 ];
 
 // Room state storage: roomId -> { id, adminSocketId, bpm, isPlaying, users: { [socketId]: userObj } }

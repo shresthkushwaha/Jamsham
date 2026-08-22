@@ -10,11 +10,8 @@ interface LobbyProps {
 
 const INSTRUMENT_OPTIONS = [
   { id: 'DRUMS', name: 'Acoustic Drums', role: 'Rhythm & Beats', color: '#FF5722', icon: '🥁' },
-  { id: 'GUITAR', name: 'Guitar & Chords', role: 'Chords & Riffs', color: '#FF9800', icon: '🎸' },
   { id: 'PIANO', name: 'Grand Piano', role: 'Melody & Harmony', color: '#00E676', icon: '🎹' },
   { id: 'BASS', name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB', icon: '🎸' },
-  { id: 'SAX', name: 'Saxophone & Horns', role: 'Soulful Leads', color: '#FFD600', icon: '🎷' },
-  { id: 'STRINGS', name: 'String Section', role: 'Violin & Cello Swells', color: '#00B0FF', icon: '🎻' },
   { id: 'AUTO', name: 'Auto-Assign', role: 'Random Assignment', color: '#9E9E9E', icon: '🎲' },
 ];
 

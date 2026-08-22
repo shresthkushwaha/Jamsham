@@ -35,11 +35,8 @@ export interface ChatMessage {
 
 const INSTRUMENT_POOL = [
   { id: 'DRUMS', name: 'Acoustic Drums', role: 'Rhythm & Beats', color: '#FF5722' },
-  { id: 'GUITAR', name: 'Acoustic / Electric Guitar', role: 'Chords & Riffs', color: '#FF9800' },
-  { id: 'BASS', name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB' },
   { id: 'PIANO', name: 'Grand Piano', role: 'Melody & Harmony', color: '#00E676' },
-  { id: 'SAX', name: 'Saxophone & Horns', role: 'Soulful Leads', color: '#FFD600' },
-  { id: 'STRINGS', name: 'String Section', role: 'Violin & Cello Swells', color: '#00B0FF' },
+  { id: 'BASS', name: 'Electric Bass', role: 'Groove & Low End', color: '#E040FB' },
 ];
 
 const ICE_SERVERS: RTCConfiguration = {

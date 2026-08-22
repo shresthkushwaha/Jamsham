@@ -107,7 +107,7 @@ export default function BottomInstrumentPanel({
     if (!localPressed.includes(noteOrChordId)) {
       setLocalPressed((prev) => [...prev, noteOrChordId]);
     }
-    if (instrumentId === 'GUITAR' && chordNotes) {
+    if ((instrumentId === 'GUITAR' || instrumentId === 'BASS') && chordNotes) {
       onPlay(chordNotes, 0.9);
     } else {
       onPlay(noteOrChordId, 0.9);
@@ -187,7 +187,7 @@ export default function BottomInstrumentPanel({
         if (drumSound && !localPressed.includes(drumSound)) {
           triggerNoteOn(drumSound);
         }
-      } else if (instrumentId === 'GUITAR') {
+      } else if (instrumentId === 'GUITAR' || instrumentId === 'BASS') {
         const chordInfo = guitarKeyMap[key];
         if (chordInfo && !localPressed.includes(chordInfo.id)) {
           triggerNoteOn(chordInfo.id, chordInfo.notes);
@@ -207,7 +207,7 @@ export default function BottomInstrumentPanel({
       if (instrumentId === 'DRUM' || instrumentId?.toUpperCase() === 'DRUMS') {
         const drumSound = drumKeyMap[key];
         if (drumSound) triggerNoteOff(drumSound);
-      } else if (instrumentId === 'GUITAR') {
+      } else if (instrumentId === 'GUITAR' || instrumentId === 'BASS') {
         const chordInfo = guitarKeyMap[key];
         if (chordInfo) triggerNoteOff(chordInfo.id);
       } else {
@@ -260,7 +260,7 @@ export default function BottomInstrumentPanel({
                 })}
               </div>
             </div>
-          ) : instrumentId === 'GUITAR' ? (
+          ) : instrumentId === 'GUITAR' || instrumentId === 'BASS' ? (
             // SOUNDTRAP GUITAR CHORD SEQUENCER (Screenshot Recreation)
             <div style={soundtrapGuitarWrapper}>
               {/* Top Control Bar */}
