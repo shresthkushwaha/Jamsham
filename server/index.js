@@ -22,15 +22,16 @@ const ALL_INSTRUMENTS = [
   { id: 'TRUMPET', name: 'Trumpet', color: '#FFD600', role: 'Brass & Solo' },
 ];
 
-// Room state storage: roomId -> { id, bpm, isPlaying, users: { [socketId]: userObj } }
+// Room state storage: roomId -> { id, bpm, isPlaying, assignmentMode, users: { [socketId]: userObj } }
 const rooms = new Map();
 
-function getOrCreateRoom(roomId) {
+function getOrCreateRoom(roomId, assignmentMode = 'random') {
   if (!rooms.has(roomId)) {
     rooms.set(roomId, {
       id: roomId,
       bpm: 120,
       isPlaying: true,
+      assignmentMode: assignmentMode || 'random',
       users: {},
     });
   }
@@ -52,17 +53,76 @@ function assignInstrument(room) {
   return { ...ALL_INSTRUMENTS[randomIndex], isShared: true };
 }
 
+// HTTP API for room info query
+app.get('/room-info/:roomId', (req, res) => {
+  const cleanRoomId = (req.params.roomId || '').trim().toLowerCase();
+  const room = rooms.get(cleanRoomId);
+  if (!room) {
+    return res.json({ exists: false, allInstruments: ALL_INSTRUMENTS });
+  }
+
+  const assigned = new Set(Object.values(room.users).map((u) => u.instrument?.id));
+  const availableInstruments = ALL_INSTRUMENTS.filter((inst) => !assigned.has(inst.id));
+
+  res.json({
+    exists: true,
+    assignmentMode: room.assignmentMode || 'random',
+    availableInstruments,
+    allInstruments: ALL_INSTRUMENTS,
+    usersCount: Object.keys(room.users).length,
+  });
+});
+
 io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
   let currentRoomId = null;
 
-  socket.on('join_room', ({ roomId, userName }, callback) => {
+  // Query Room Info
+  socket.on('get_room_info', ({ roomId }, callback) => {
+    const cleanRoomId = (roomId || '').trim().toLowerCase();
+    const room = rooms.get(cleanRoomId);
+    if (!room) {
+      if (callback) callback({ exists: false, allInstruments: ALL_INSTRUMENTS });
+      return;
+    }
+    const assigned = new Set(Object.values(room.users).map((u) => u.instrument?.id));
+    const availableInstruments = ALL_INSTRUMENTS.filter((inst) => !assigned.has(inst.id));
+    if (callback) {
+      callback({
+        exists: true,
+        assignmentMode: room.assignmentMode || 'random',
+        availableInstruments,
+        allInstruments: ALL_INSTRUMENTS,
+        usersCount: Object.keys(room.users).length,
+      });
+    }
+  });
+
+  socket.on('join_room', ({ roomId, userName, preferredInstrument, assignmentMode }, callback) => {
     const cleanRoomId = (roomId || 'main-stage').trim().toLowerCase();
     currentRoomId = cleanRoomId;
     socket.join(cleanRoomId);
 
-    const room = getOrCreateRoom(cleanRoomId);
-    const instrument = assignInstrument(room);
+    const room = getOrCreateRoom(cleanRoomId, assignmentMode);
+    if (assignmentMode) {
+      room.assignmentMode = assignmentMode;
+    }
+
+    let instrument;
+    if (preferredInstrument) {
+      const match = ALL_INSTRUMENTS.find(
+        (inst) =>
+          inst.id.toUpperCase() === preferredInstrument.toUpperCase() ||
+          inst.name.toUpperCase().includes(preferredInstrument.toUpperCase())
+      );
+      if (match) {
+        instrument = match;
+      }
+    }
+
+    if (!instrument) {
+      instrument = assignInstrument(room);
+    }
 
     const user = {
       socketId: socket.id,
@@ -75,9 +135,9 @@ io.on('connection', (socket) => {
 
     room.users[socket.id] = user;
 
-    console.log(`[User Joined] ${user.userName} (${user.instrument.name}) in room: ${cleanRoomId}`);
+    console.log(`[User Joined] ${user.userName} (${user.instrument.name}) in room: ${cleanRoomId} [Mode: ${room.assignmentMode}]`);
 
-    // Notify all existing users in the room that a new peer arrived (initiates WebRTC offer)
+    // Notify all existing users in the room that a new peer arrived
     socket.to(cleanRoomId).emit('user_joined', {
       user,
       allUsers: Object.values(room.users),
@@ -91,6 +151,7 @@ io.on('connection', (socket) => {
           id: room.id,
           bpm: room.bpm,
           isPlaying: room.isPlaying,
+          assignmentMode: room.assignmentMode,
           users: Object.values(room.users),
         },
       });

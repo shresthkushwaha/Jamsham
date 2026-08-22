@@ -81,7 +81,9 @@ export class WebRTCManager {
   public async connectAndJoin(
     roomId: string,
     userName: string,
-    serverUrl?: string
+    serverUrl?: string,
+    preferredInstrument?: string,
+    assignmentMode?: 'random' | 'custom'
   ): Promise<{ user: User; users: User[]; bpm: number }> {
     this.roomId = roomId;
 
@@ -117,7 +119,7 @@ export class WebRTCManager {
     // If no backend URL configured on production, enter resilient Solo/Creator mode
     if (!backendUrl) {
       console.info('[WebRTC] No external backend URL configured. Entering standalone Jam Stage.');
-      return this.enterStandaloneMode(roomId, userName);
+      return this.enterStandaloneMode(roomId, userName, preferredInstrument);
     }
 
     return new Promise((resolve) => {
@@ -128,7 +130,7 @@ export class WebRTCManager {
         if (!hasResolved) {
           hasResolved = true;
           console.warn('[WebRTC] Backend connection timed out. Launching standalone Jam Stage.');
-          resolve(this.enterStandaloneMode(roomId, userName));
+          resolve(this.enterStandaloneMode(roomId, userName, preferredInstrument));
         }
       }, 3500);
 
@@ -146,52 +148,70 @@ export class WebRTCManager {
           if (!hasResolved) {
             hasResolved = true;
             clearTimeout(timeoutId);
-            resolve(this.enterStandaloneMode(roomId, userName));
+            resolve(this.enterStandaloneMode(roomId, userName, preferredInstrument));
           }
         });
 
-        this.socket.emit('join_room', { roomId, userName }, (res: any) => {
-          if (!hasResolved) {
-            hasResolved = true;
-            clearTimeout(timeoutId);
+        this.socket.emit(
+          'join_room',
+          { roomId, userName, preferredInstrument, assignmentMode },
+          (res: any) => {
+            if (!hasResolved) {
+              hasResolved = true;
+              clearTimeout(timeoutId);
 
-            if (res?.success) {
-              this.localUser = res.user;
+              if (res?.success) {
+                this.localUser = res.user;
 
-              // Start audio monitoring for local user
-              if (this.localStream && this.localUser) {
-                this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
+                // Start audio monitoring for local user
+                if (this.localStream && this.localUser) {
+                  this.attachAudioAnalyser(this.localUser.socketId, this.localStream);
+                }
+                this.startVolumeMonitoring();
+
+                resolve({
+                  user: res.user,
+                  users: res.room.users,
+                  bpm: res.room.bpm,
+                });
+              } else {
+                resolve(this.enterStandaloneMode(roomId, userName, preferredInstrument));
               }
-              this.startVolumeMonitoring();
-
-              resolve({
-                user: res.user,
-                users: res.room.users,
-                bpm: res.room.bpm,
-              });
-            } else {
-              resolve(this.enterStandaloneMode(roomId, userName));
             }
           }
-        });
+        );
       } catch (err) {
         if (!hasResolved) {
           hasResolved = true;
           clearTimeout(timeoutId);
-          resolve(this.enterStandaloneMode(roomId, userName));
+          resolve(this.enterStandaloneMode(roomId, userName, preferredInstrument));
         }
       }
     });
   }
 
   // Standalone mode fallback when external backend is offline
-  private enterStandaloneMode(roomId: string, userName: string): { user: User; users: User[]; bpm: number } {
+  private enterStandaloneMode(
+    roomId: string,
+    userName: string,
+    preferredInstrument?: string
+  ): { user: User; users: User[]; bpm: number } {
     this.isSoloMode = true;
-    const randomInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
+
+    let chosenInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
+    if (preferredInstrument) {
+      const match = INSTRUMENT_POOL.find(
+        (inst) =>
+          inst.id.toUpperCase() === preferredInstrument.toUpperCase() ||
+          inst.name.toUpperCase().includes(preferredInstrument.toUpperCase())
+      );
+      if (match) chosenInst = match;
+    }
+
     const mockUser: User = {
       socketId: `solo-${Math.random().toString(36).substring(2, 9)}`,
       userName: userName || 'Host',
-      instrument: randomInst,
+      instrument: chosenInst,
       isAdmin: true,
       isMuted: false,
       isVideoOff: false,

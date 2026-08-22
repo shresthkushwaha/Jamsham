@@ -24,6 +24,10 @@ export default function BottomInstrumentPanel({
   const [localPressed, setLocalPressed] = useState<string[]>([]);
   const displayNotes = Array.from(new Set([...activeNotes, ...localPressed]));
 
+  const normId = (instrumentId || 'KEYBOARD').toUpperCase();
+  const isDrum = normId.includes('DRUM');
+  const isGuitar = normId.includes('GUITAR') || normId.includes('STRUM');
+
   const ACCENT_COLOR = '#7C4DFF';
 
   // --- KEYBOARD (SoundTrap C3-C5) ---
@@ -103,7 +107,7 @@ export default function BottomInstrumentPanel({
     if (!localPressed.includes(noteOrChordId)) {
       setLocalPressed((prev) => [...prev, noteOrChordId]);
     }
-    if (instrumentId === 'GUITAR' && chordNotes) {
+    if (isGuitar && chordNotes) {
       onPlay(chordNotes, 0.9);
     } else {
       onPlay(noteOrChordId, 0.9);
@@ -120,12 +124,12 @@ export default function BottomInstrumentPanel({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.repeat) return;
       const key = e.key.toLowerCase();
 
-      if (instrumentId === 'DRUM') {
+      if (isDrum) {
         const drumSound = drumKeyMap[key];
         if (drumSound && !localPressed.includes(drumSound)) {
           triggerNoteOn(drumSound);
         }
-      } else if (instrumentId === 'GUITAR') {
+      } else if (isGuitar) {
         const chordInfo = guitarKeyMap[key];
         if (chordInfo && !localPressed.includes(chordInfo.id)) {
           triggerNoteOn(chordInfo.id, chordInfo.notes);
@@ -142,10 +146,10 @@ export default function BottomInstrumentPanel({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const key = e.key.toLowerCase();
 
-      if (instrumentId === 'DRUM') {
+      if (isDrum) {
         const drumSound = drumKeyMap[key];
         if (drumSound) triggerNoteOff(drumSound);
-      } else if (instrumentId === 'GUITAR') {
+      } else if (isGuitar) {
         const chordInfo = guitarKeyMap[key];
         if (chordInfo) triggerNoteOff(chordInfo.id);
       } else {
@@ -160,13 +164,13 @@ export default function BottomInstrumentPanel({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [localPressed, instrumentId]);
+  }, [localPressed, isDrum, isGuitar]);
 
   return (
     <div style={panelWrapperStyle}>
       {/* Instrument Surface Area */}
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {instrumentId === 'DRUM' ? (
+        {isDrum ? (
           // FREEDRUM INSTANCE
           <div style={freedrumWrapper}>
             <div style={freedrumArcGrid}>
@@ -197,7 +201,7 @@ export default function BottomInstrumentPanel({
               })}
             </div>
           </div>
-        ) : instrumentId === 'GUITAR' ? (
+        ) : isGuitar ? (
           // SOUNDTRAP GUITAR CHORD SEQUENCER (Screenshot Recreation)
           <div style={soundtrapGuitarWrapper}>
             {/* Top Control Bar */}

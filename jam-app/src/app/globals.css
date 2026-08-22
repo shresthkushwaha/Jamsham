@@ -1,6 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+
 :root {
-  --background: #121214;
-  --foreground: #ededed;
+  --background: #000000;
+  --foreground: #ffffff;
 }
 
 html {

@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Copy, Check } from 'lucide-react';
 import InstrumentAsciiCanvas, { InstrumentTheme, INSTRUMENT_THEMES } from './InstrumentAsciiCanvas';
 
-interface LobbyProps {
-  onJoin: (
+export interface LandingPageProps {
+  onJoin?: (
     roomId: string,
     userName: string,
     preferredInstrument?: string,
@@ -31,7 +31,7 @@ function generateRandomCode(): string {
   return `JAM-${num}`;
 }
 
-export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
+export default function LandingPage({ onJoin, isLoading = false }: LandingPageProps) {
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const [displayName, setDisplayName] = useState('');
   
@@ -126,23 +126,27 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!createdRoomCode.trim()) return;
-    onJoin(
-      createdRoomCode.trim(),
-      displayName.trim() || 'Band Leader',
-      assignmentMode === 'custom' ? creatorSelectedInst : undefined,
-      assignmentMode
-    );
+    if (onJoin) {
+      onJoin(
+        createdRoomCode.trim(),
+        displayName.trim() || 'Band Leader',
+        assignmentMode === 'custom' ? creatorSelectedInst : undefined,
+        assignmentMode
+      );
+    }
   };
 
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinRoomCode.trim()) return;
-    onJoin(
-      joinRoomCode.trim(),
-      displayName.trim() || 'Musician',
-      isJoinRoomCustom ? joinSelectedInst : undefined,
-      undefined
-    );
+    if (onJoin) {
+      onJoin(
+        joinRoomCode.trim(),
+        displayName.trim() || 'Musician',
+        isJoinRoomCustom ? joinSelectedInst : undefined,
+        undefined
+      );
+    }
   };
 
   const textCol = currentTheme.textColor;

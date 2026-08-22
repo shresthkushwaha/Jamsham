@@ -28,7 +28,12 @@ export default function JamRoomPage() {
   const webrtcRef = useRef<WebRTCManager | null>(null);
 
   // Join Room
-  const handleJoin = async (targetRoomId: string, userName: string) => {
+  const handleJoin = async (
+    targetRoomId: string,
+    userName: string,
+    preferredInstrument?: string,
+    assignmentMode?: 'random' | 'custom'
+  ) => {
     setIsLoading(true);
     try {
       await audioEngine.init();
@@ -79,7 +84,13 @@ export default function JamRoomPage() {
       manager.onBpmUpdated = (newBpm) => setBpm(newBpm);
       manager.onVolumeLevels = (levels) => setVolumeLevels(levels);
 
-      const result = await manager.connectAndJoin(targetRoomId, userName);
+      const result = await manager.connectAndJoin(
+        targetRoomId,
+        userName,
+        undefined,
+        preferredInstrument,
+        assignmentMode
+      );
       setLocalUser(result.user);
       setUsers(result.users);
       setBpm(result.bpm);
