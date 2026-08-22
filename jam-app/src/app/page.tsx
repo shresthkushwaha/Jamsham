@@ -46,7 +46,7 @@ export default function JamRoomPage() {
     setIsRecording(false);
   };
 
-  const handleJoin = async (targetRoomId: string, userName: string) => {
+  const handleJoin = async (targetRoomId: string, userName: string, chosenInstrument?: string) => {
     setIsLoading(true);
     try {
       await audioEngine.init();
@@ -108,7 +108,7 @@ export default function JamRoomPage() {
         alert(muted ? 'The host has muted your microphone.' : 'The host has unmuted your microphone.');
       };
 
-      const { user, users: roomUsers, bpm: roomBpm } = await manager.connectAndJoin(targetRoomId, userName);
+      const { user, users: roomUsers, bpm: roomBpm } = await manager.connectAndJoin(targetRoomId, userName, chosenInstrument);
 
       setLocalUser(user);
       setUsers(roomUsers);

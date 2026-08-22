@@ -19,7 +19,7 @@ const INSTRUMENT_POOL = [
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { roomId, userName, isAdmin } = body;
+    const { roomId, userName, isAdmin, chosenInstrument } = body;
 
     if (!roomId || !userName) {
       return NextResponse.json({ error: 'Missing roomId or userName' }, { status: 400 });
@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
 
     const participantIdentity = `${userName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Math.random().toString(36).substring(2, 7)}`;
     
-    // Pick instrument based on random or order
-    const randomInst = INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
+    // Pick chosen instrument or random
+    const instrument = (chosenInstrument && INSTRUMENT_POOL.find((i) => i.id === chosenInstrument)) ||
+      INSTRUMENT_POOL[Math.floor(Math.random() * INSTRUMENT_POOL.length)];
 
     const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
       identity: participantIdentity,
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
       metadata: JSON.stringify({
         userName,
         isAdmin: !!isAdmin,
-        instrument: randomInst,
+        instrument,
       }),
     });
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
       token,
       serverUrl: LIVEKIT_URL,
       identity: participantIdentity,
-      instrument: randomInst,
+      instrument,
     });
   } catch (err: any) {
     console.error('[LiveKit Token Error]:', err);

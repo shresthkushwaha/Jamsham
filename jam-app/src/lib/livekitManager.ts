@@ -62,7 +62,8 @@ export class LiveKitManager {
 
   public async connectAndJoin(
     roomId: string,
-    userName: string
+    userName: string,
+    chosenInstrument?: string
   ): Promise<{ user: User; users: User[]; bpm: number }> {
     this.roomId = roomId;
 
@@ -70,7 +71,7 @@ export class LiveKitManager {
     const res = await fetch('/api/livekit/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId, userName }),
+      body: JSON.stringify({ roomId, userName, chosenInstrument }),
     });
 
     if (!res.ok) {

@@ -3,20 +3,20 @@ import React, { useState, useEffect } from 'react';
 import { Radio, PlusCircle, LogIn, ArrowRight, Dices, ShieldCheck } from 'lucide-react';
 
 interface LobbyProps {
-  onJoin: (roomId: string, userName: string) => void;
+  onJoin: (roomId: string, userName: string, chosenInstrument?: string) => void;
   isLoading?: boolean;
   defaultRoomId?: string;
 }
 
-const INSTRUMENT_SHOWCASE = [
-  { name: 'Guitar', color: '#FF9800', icon: '🎸' },
-  { name: 'Keyboard', color: '#00E676', icon: '🎹' },
-  { name: 'Drum Kit', color: '#FF5722', icon: '🥁' },
-  { name: 'Classical Sitar', color: '#E040FB', icon: '🪕' },
-  { name: 'Bansuri Flute', color: '#00B0FF', icon: '🪈' },
-  { name: 'Brass Trumpet', color: '#FFD600', icon: '🎺' },
-  { name: 'Saxophone', color: '#AB47BC', icon: '🎷' },
-  { name: 'Acoustic Violin', color: '#29B6F6', icon: '🎻' },
+const INSTRUMENT_OPTIONS = [
+  { id: 'GUITAR', name: 'Guitar', color: '#FF9800', icon: '🎸' },
+  { id: 'KEYBOARD', name: 'Keyboard', color: '#00E676', icon: '🎹' },
+  { id: 'DRUM', name: 'Drum Kit', color: '#FF5722', icon: '🥁' },
+  { id: 'SITAR', name: 'Classical Sitar', color: '#E040FB', icon: '🪕' },
+  { id: 'FLUTE', name: 'Bansuri Flute', color: '#00B0FF', icon: '🪈' },
+  { id: 'TRUMPET', name: 'Brass Trumpet', color: '#FFD600', icon: '🎺' },
+  { id: 'SAXOPHONE', name: 'Saxophone', color: '#AB47BC', icon: '🎷' },
+  { id: 'VIOLIN', name: 'Acoustic Violin', color: '#29B6F6', icon: '🎻' },
 ];
 
 function generateUniqueSessionKey(): string {
@@ -33,6 +33,7 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
   const [userName, setUserName] = useState('');
   const [createdRoomId, setCreatedRoomId] = useState('');
   const [joinRoomId, setJoinRoomId] = useState('');
+  const [selectedInstrument, setSelectedInstrument] = useState<string>('KEYBOARD');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -51,7 +52,7 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
     e.preventDefault();
     const finalRoomId = mode === 'create' ? createdRoomId.trim() : joinRoomId.trim();
     if (!finalRoomId) return;
-    onJoin(finalRoomId, userName.trim() || (mode === 'create' ? 'Host' : 'Musician'));
+    onJoin(finalRoomId, userName.trim() || (mode === 'create' ? 'Host' : 'Musician'), selectedInstrument);
   };
 
   return (
@@ -119,10 +120,11 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <label style={labelStyle}>NEW GENERATED SESSION CODE</label>
-                <button type="button" onClick={handleRegenerateKey} style={randomBtnStyle}>
+                <button type="button" onClick={handleRegenerateKey} style={randomBtnStyle} title="Generate another unique code">
                   <Dices size={13} style={{ marginRight: '4px' }} /> New Code
                 </button>
               </div>
+
               <div style={keyDisplayContainer}>
                 <span style={keyDisplayCode}>Code- {createdRoomId || '...'}</span>
                 <span style={adminTagStyle}>
@@ -144,26 +146,37 @@ export default function Lobby({ onJoin, isLoading = false, defaultRoomId }: Lobb
             </div>
           )}
 
-          {/* Instrument Pool */}
+          {/* Interactive Instrument Selection Control */}
           <div style={instrumentPoolContainer}>
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px', fontWeight: 600 }}>
-              BAND ROLES (AUTO-ASSIGNED ON JOIN):
+            <div style={{ fontSize: '11px', color: '#AAA', marginBottom: '8px', fontWeight: 700, letterSpacing: '0.5px' }}>
+              SELECT YOUR INSTRUMENT ROLE:
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {INSTRUMENT_SHOWCASE.map((inst) => (
-                <div
-                  key={inst.name}
-                  style={{
-                    ...instPill,
-                    borderColor: `${inst.color}44`,
-                    background: `${inst.color}11`,
-                    color: inst.color,
-                  }}
-                >
-                  <span style={{ marginRight: '4px' }}>{inst.icon}</span>
-                  <span>{inst.name}</span>
-                </div>
-              ))}
+              {INSTRUMENT_OPTIONS.map((inst) => {
+                const isSelected = selectedInstrument === inst.id;
+                return (
+                  <button
+                    key={inst.id}
+                    type="button"
+                    onClick={() => setSelectedInstrument(inst.id)}
+                    style={{
+                      ...instPill,
+                      cursor: 'pointer',
+                      border: isSelected ? `2px solid ${inst.color}` : '1px solid rgba(255, 255, 255, 0.12)',
+                      background: isSelected ? `${inst.color}25` : 'rgba(255, 255, 255, 0.03)',
+                      color: isSelected ? '#FFFFFF' : '#AAAAAA',
+                      boxShadow: isSelected ? `0 0 14px ${inst.color}55` : 'none',
+                      transform: isSelected ? 'scale(1.03)' : 'scale(1)',
+                      transition: 'all 0.15s ease',
+                      outline: 'none',
+                    }}
+                  >
+                    <span style={{ marginRight: '5px' }}>{inst.icon}</span>
+                    <span style={{ fontWeight: isSelected ? 800 : 500 }}>{inst.name}</span>
+                    {isSelected && <span style={{ marginLeft: '4px', fontSize: '10px', color: inst.color }}>✓</span>}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -300,6 +313,7 @@ const inputStyle: React.CSSProperties = {
   color: '#fff',
   fontSize: '14px',
   outline: 'none',
+  transition: 'border-color 0.2s',
   boxSizing: 'border-box',
 };
 
@@ -352,7 +366,7 @@ const instPill: React.CSSProperties = {
   alignItems: 'center',
   fontSize: '11px',
   fontWeight: 600,
-  padding: '4px 10px',
+  padding: '6px 12px',
   borderRadius: '20px',
   border: '1px solid',
 };
@@ -370,5 +384,7 @@ const joinBtnStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   gap: '8px',
+  boxShadow: '0 8px 24px rgba(0, 230, 118, 0.25)',
   marginTop: '8px',
+  transition: 'transform 0.1s ease',
 };
