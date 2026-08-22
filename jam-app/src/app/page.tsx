@@ -2,10 +2,10 @@
 import React, { useState, useRef } from 'react';
 import { audioEngine } from '@/lib/audioEngine';
 import { LiveKitManager, User, NoteEvent } from '@/lib/livekitManager';
-import Lobby from '@/components/Lobby';
+import LandingPage from '@/components/LandingPage';
 import MinimalHeader from '@/components/stage/MinimalHeader';
 import BubbleStage from '@/components/stage/BubbleStage';
-import NoteTriggerDeck from '@/components/stage/NoteTriggerDeck';
+import BottomInstrumentPanel from '@/components/BottomInstrumentPanel';
 import { videoSessionRecorder } from '@/lib/videoSessionRecorder';
 
 export default function JamRoomPage() {
@@ -243,7 +243,7 @@ export default function JamRoomPage() {
   };
 
   if (!isInRoom) {
-    return <Lobby onJoin={handleJoin} isLoading={isLoading} />;
+    return <LandingPage onJoin={handleJoin} isLoading={isLoading} />;
   }
 
   return (
@@ -304,15 +304,17 @@ export default function JamRoomPage() {
         onAdminKick={handleAdminKick}
       />
 
-      {/* 3. Note Trigger Deck at the bottom */}
-      <NoteTriggerDeck
-        instrumentId={localUser?.instrument?.id || 'KEYBOARD'}
-        instrumentName={localUser?.instrument?.name}
-        instrumentColor={localUser?.instrument?.color}
-        onPlay={handleNotePlay}
-        onStop={handleNoteStop}
-        activeNotes={activeNotesByUser[localUser?.socketId || ''] || []}
-      />
+      {/* 3. Bottom Instrument Panel (SoundTrap Keyboard, Guitar Matrix, Figma Drums, Hover Mode) */}
+      <div style={bottomInstrumentPanelContainer}>
+        <BottomInstrumentPanel
+          instrumentId={localUser?.instrument?.id || 'KEYBOARD'}
+          instrumentName={localUser?.instrument?.name || 'Keyboard'}
+          instrumentColor={localUser?.instrument?.color}
+          onPlay={handleNotePlay}
+          onStop={handleNoteStop}
+          activeNotes={activeNotesByUser[localUser?.socketId || ''] || []}
+        />
+      </div>
     </div>
   );
 }
@@ -324,4 +326,15 @@ const pureMainFrameStyle: React.CSSProperties = {
   height: '100vh',
   background: '#09090f',
   overflow: 'hidden',
+};
+
+const bottomInstrumentPanelContainer: React.CSSProperties = {
+  width: '100%',
+  height: '210px',
+  padding: '10px 20px',
+  background: 'rgba(12, 13, 20, 0.95)',
+  backdropFilter: 'blur(16px)',
+  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+  boxSizing: 'border-box',
+  zIndex: 20,
 };

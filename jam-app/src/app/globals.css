@@ -1,6 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+
 :root {
-  --background: #121214;
-  --foreground: #ededed;
+  --background: #000000;
+  --foreground: #ffffff;
 }
 
 html {
@@ -112,5 +114,23 @@ a {
   height: 10px;
   background-color: #333333;
   border-radius: 2px;
+}
+
+/* ── Responsive Landing Page ── */
+@media (max-width: 880px) {
+  .ascii-art-pane {
+    display: none !important;
+  }
+  .landing-centered-cluster {
+    transform: none !important;
+    gap: 0 !important;
+    max-width: 100% !important;
+    justify-content: center !important;
+  }
+  .landing-white-box {
+    flex: 1 1 100% !important;
+    max-width: 390px !important;
+    width: 100% !important;
+  }
 }
 

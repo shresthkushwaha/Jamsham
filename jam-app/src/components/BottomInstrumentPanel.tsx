@@ -17,14 +17,18 @@ interface BottomInstrumentPanelProps {
 export default function BottomInstrumentPanel({
   instrumentId,
   instrumentName,
+  instrumentColor = '#FF6D00',
   onPlay,
   onStop,
   activeNotes = [],
 }: BottomInstrumentPanelProps) {
   const [localPressed, setLocalPressed] = useState<string[]>([]);
+  const [isHoverPlayMode, setIsHoverPlayMode] = useState<boolean>(false);
   const displayNotes = Array.from(new Set([...activeNotes, ...localPressed]));
 
-  const ACCENT_COLOR = '#7C4DFF';
+  const ACCENT_COLOR = instrumentColor || '#FF6D00';
+  const isMouseDownRef = React.useRef(false);
+  const activeHoverIdRef = React.useRef<string | null>(null);
 
   // --- KEYBOARD (SoundTrap C3-C5) ---
   const keyboardWhiteKeys = [
@@ -83,16 +87,16 @@ export default function BottomInstrumentPanel({
     k: { id: 'D_MAJOR', notes: ['D3', 'A3', 'D4', 'F#4'] },
   };
 
-  // --- DRUMS (Freedrum Concentric Ring Arc) ---
+  // --- DRUMS (Figma Layout + Matching Set Stroke Colors + Video Ring Color Highlight) ---
   const drumPads = [
-    { id: 'CRASH', name: 'Crash Cymbal', key: 'H', color: '#FFD600', icon: '✨', position: { gridColumn: '2 / span 2', gridRow: '1' } },
-    { id: 'TOM 1', name: 'Rack Tom 1', key: 'F', color: '#00E5FF', icon: '🔴', position: { gridColumn: '1', gridRow: '1' } },
-    { id: 'TOM 2', name: 'Rack Tom 2', key: 'G', color: '#00E5FF', icon: '🔵', position: { gridColumn: '4', gridRow: '1' } },
-    { id: 'HIHAT', name: 'Closed Hi-Hat', key: 'D', color: '#00E676', icon: '💥', position: { gridColumn: '1', gridRow: '2' } },
-    { id: 'COWBELL', name: 'Cowbell', key: 'K', color: '#E040FB', icon: '🔔', position: { gridColumn: '4', gridRow: '2' } },
-    { id: 'CLAP', name: 'Hand Clap', key: 'J', color: '#FFAB00', icon: '👏', position: { gridColumn: '1 / span 1', gridRow: '3' } },
-    { id: 'KICK', name: 'Kick Drum', key: 'A', color: '#FF2D55', icon: '🥁', position: { gridColumn: '2', gridRow: '2 / span 2' } },
-    { id: 'SNARE', name: 'Snare', key: 'S', color: '#FF6D00', icon: '🪘', position: { gridColumn: '3', gridRow: '2 / span 2' } },
+    { id: 'KICK', name: 'Kick', key: 'A', strokeColor: '#FF2D55', setGroup: 'BASS_SNARE', icon: 'kick' },
+    { id: 'SNARE', name: 'Snare', key: 'S', strokeColor: '#FF2D55', setGroup: 'BASS_SNARE', icon: 'snare' },
+    { id: 'HIHAT', name: 'Hi-Hat', key: 'D', strokeColor: '#00E676', setGroup: 'CYMBALS', icon: 'hihat' },
+    { id: 'TOM 1', name: 'Tom 1', key: 'F', strokeColor: '#FF6D00', setGroup: 'TOMS', icon: 'tom' },
+    { id: 'TOM 2', name: 'Tom 2', key: 'G', strokeColor: '#FF6D00', setGroup: 'TOMS', icon: 'tom' },
+    { id: 'CRASH', name: 'Crash', key: 'H', strokeColor: '#00E676', setGroup: 'CYMBALS', icon: 'crash' },
+    { id: 'CLAP', name: 'Clap', key: 'J', strokeColor: '#00E5FF', setGroup: 'PERC', icon: 'clap' },
+    { id: 'COWBELL', name: 'Cowbell', key: 'K', strokeColor: '#00E5FF', setGroup: 'PERC', icon: 'cowbell' },
   ];
 
   const drumKeyMap: Record<string, string> = {
@@ -103,7 +107,7 @@ export default function BottomInstrumentPanel({
     if (!localPressed.includes(noteOrChordId)) {
       setLocalPressed((prev) => [...prev, noteOrChordId]);
     }
-    if (instrumentId === 'GUITAR' && chordNotes) {
+    if ((instrumentId === 'GUITAR' || instrumentId === 'BASS') && chordNotes) {
       onPlay(chordNotes, 0.9);
     } else {
       onPlay(noteOrChordId, 0.9);
@@ -115,17 +119,75 @@ export default function BottomInstrumentPanel({
     if (onStop) onStop(noteOrChordId);
   };
 
+  // Hover Play & Click-and-Drag (Glissando) Interaction Handlers
+  const handleItemMouseDown = (id: string, notes?: string[]) => {
+    isMouseDownRef.current = true;
+    if (activeHoverIdRef.current && activeHoverIdRef.current !== id) {
+      triggerNoteOff(activeHoverIdRef.current);
+    }
+    activeHoverIdRef.current = id;
+    triggerNoteOn(id, notes);
+  };
+
+  const handleItemMouseEnter = (id: string, notes?: string[]) => {
+    if (isHoverPlayMode || isMouseDownRef.current) {
+      if (activeHoverIdRef.current && activeHoverIdRef.current !== id) {
+        triggerNoteOff(activeHoverIdRef.current);
+      }
+      activeHoverIdRef.current = id;
+      triggerNoteOn(id, notes);
+    }
+  };
+
+  const handleItemMouseLeave = (id: string) => {
+    if (isHoverPlayMode || (isMouseDownRef.current && activeHoverIdRef.current === id)) {
+      triggerNoteOff(id);
+      if (activeHoverIdRef.current === id) {
+        activeHoverIdRef.current = null;
+      }
+    }
+  };
+
+  const handleItemMouseUp = (id: string) => {
+    if (!isHoverPlayMode) {
+      isMouseDownRef.current = false;
+      triggerNoteOff(id);
+      if (activeHoverIdRef.current === id) {
+        activeHoverIdRef.current = null;
+      }
+    }
+  };
+
+  // Global Pointer Up listener to stop active drag/glissando
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        if (activeHoverIdRef.current) {
+          triggerNoteOff(activeHoverIdRef.current);
+          activeHoverIdRef.current = null;
+        }
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalPointerUp);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalPointerUp);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+    };
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.repeat) return;
       const key = e.key.toLowerCase();
 
-      if (instrumentId === 'DRUM') {
+      if (instrumentId === 'DRUM' || instrumentId?.toUpperCase() === 'DRUMS') {
         const drumSound = drumKeyMap[key];
         if (drumSound && !localPressed.includes(drumSound)) {
           triggerNoteOn(drumSound);
         }
-      } else if (instrumentId === 'GUITAR') {
+      } else if (instrumentId === 'GUITAR' || instrumentId === 'BASS') {
         const chordInfo = guitarKeyMap[key];
         if (chordInfo && !localPressed.includes(chordInfo.id)) {
           triggerNoteOn(chordInfo.id, chordInfo.notes);
@@ -142,10 +204,10 @@ export default function BottomInstrumentPanel({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const key = e.key.toLowerCase();
 
-      if (instrumentId === 'DRUM') {
+      if (instrumentId === 'DRUM' || instrumentId?.toUpperCase() === 'DRUMS') {
         const drumSound = drumKeyMap[key];
         if (drumSound) triggerNoteOff(drumSound);
-      } else if (instrumentId === 'GUITAR') {
+      } else if (instrumentId === 'GUITAR' || instrumentId === 'BASS') {
         const chordInfo = guitarKeyMap[key];
         if (chordInfo) triggerNoteOff(chordInfo.id);
       } else {
@@ -162,208 +224,253 @@ export default function BottomInstrumentPanel({
     };
   }, [localPressed, instrumentId]);
 
+  const normalizedInst = (instrumentId || '').toUpperCase();
+  const isDrum = normalizedInst.includes('DRUM');
+  const isGuitarOrBass = normalizedInst.includes('GUITAR') || normalizedInst.includes('BASS');
+
   return (
     <div style={panelWrapperStyle}>
-      {/* Instrument Surface Area */}
-      <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {instrumentId === 'DRUM' ? (
-          // FREEDRUM INSTANCE
-          <div style={freedrumWrapper}>
-            <div style={freedrumArcGrid}>
-              {drumPads.map((pad) => {
-                const isActive = displayNotes.includes(pad.id);
-                return (
-                  <button
-                    key={pad.id}
-                    onMouseDown={() => triggerNoteOn(pad.id)}
-                    onMouseUp={() => triggerNoteOff(pad.id)}
-                    onMouseLeave={() => triggerNoteOff(pad.id)}
-                    style={{
-                      ...freedrumPadStyle,
-                      ...pad.position,
-                      borderColor: isActive ? pad.color : 'rgba(255, 255, 255, 0.2)',
-                      background: isActive ? `${pad.color}33` : '#161622',
-                      boxShadow: isActive ? `0 0 20px ${pad.color}` : 'none',
-                      transform: isActive ? 'scale(0.94)' : 'none',
-                    }}
-                  >
-                    <div style={{ ...innerRingStyle, borderColor: pad.color }}>
-                      <span style={{ fontSize: '14px' }}>{pad.icon}</span>
-                      <span style={padKeyBadgeStyle}>{pad.key}</span>
-                      <span style={{ fontSize: '9px', fontWeight: 700, color: '#ccc', marginTop: '2px' }}>{pad.name}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : instrumentId === 'GUITAR' ? (
-          // SOUNDTRAP GUITAR CHORD SEQUENCER (Screenshot Recreation)
-          <div style={soundtrapGuitarWrapper}>
-            {/* Top Control Bar */}
-            <div style={soundtrapTopBar}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={stLabelStyle}>STYLE</span>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {Array.from({ length: 16 }).map((_, i) => (
-                    <div key={i} style={stDotStyle(i === 3)} />
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={stLabelStyle}>STRUM</span>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  {Array.from({ length: 16 }).map((_, i) => (
-                    <div key={i} style={stPillStyle(i === 2)} />
-                  ))}
-                </div>
-              </div>
-
-              <span style={stAllBtn}>ALL ●</span>
-            </div>
-
-            {/* Main Fretboard & Chord Matrix */}
-            <div style={fretboardContainer}>
-              {/* String Header Column (Left) */}
-              <div style={stringLabelsColumn}>
-                {guitarStrings.map((str, idx) => (
-                  <div key={idx} style={stringLabelBox}>
-                    <span>{str}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Chord Columns Grid (8 Columns) */}
-              <div style={chordColumnsGrid}>
-                {guitarChords.map((chord) => {
-                  const isActive = displayNotes.includes(chord.id);
-                  return (
-                    <div
-                      key={chord.id}
-                      onMouseDown={() => triggerNoteOn(chord.id, chord.notes)}
-                      onMouseUp={() => triggerNoteOff(chord.id)}
-                      onMouseLeave={() => triggerNoteOff(chord.id)}
-                      style={{
-                        ...chordColumnStyle,
-                        background: isActive ? '#8C6849' : chord.bg,
-                        boxShadow: isActive ? 'inset 0 0 15px rgba(255,255,255,0.4), 0 0 10px #D8C3A5' : 'none',
-                        transform: isActive ? 'scale(0.98)' : 'none',
-                      }}
-                    >
-                      {/* String lanes inside column */}
-                      {guitarStrings.map((_, sIdx) => {
-                        const hasNote = chord.activeStringIndices.includes(sIdx);
-                        return (
-                          <div key={sIdx} style={stringLaneStyle}>
-                            <div style={stringLineStyle} />
-                            {hasNote && (
-                              <div
-                                style={{
-                                  ...noteBlockStyle,
-                                  background: isActive ? '#FFFFFF' : '#F5EBE0',
-                                  boxShadow: isActive ? '0 0 8px #FFF' : '0 1px 3px rgba(0,0,0,0.5)',
-                                }}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-
-                      {/* Footer Badge showing Chord + Hotkey */}
-                      <div style={{ ...chordFooterBadge, background: isActive ? '#221A15' : 'rgba(0,0,0,0.5)' }}>
-                        <span style={{ color: '#D8C3A5', fontWeight: 800 }}>{chord.key}</span>
-                        <span style={{ color: '#fff', fontSize: '8px' }}>{chord.name}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : (
-          // PIANO KEYBOARD (SoundTrap Inspired C3-C5)
-          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={keyboardContainerStyle}>
-              <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-                {keyboardWhiteKeys.map((k) => {
-                  const isActive = displayNotes.includes(k.note);
-                  const isOctaveStart = k.note.startsWith('C');
+      <div style={{ width: '100%', height: '100%', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        {/* Instrument Surface Area */}
+        <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {isDrum ? (
+            // FIGMA DRUM ROW INSTANCE (Scaled & Colored to Match Video Circle Stroke)
+            <div style={figmaDrumWrapper}>
+              <div style={figmaDrumRow}>
+                {drumPads.map((pad) => {
+                  const isActive = displayNotes.includes(pad.id);
                   return (
                     <button
-                      key={k.note}
-                      onMouseDown={() => triggerNoteOn(k.note)}
-                      onMouseUp={() => triggerNoteOff(k.note)}
-                      onMouseLeave={() => triggerNoteOff(k.note)}
+                      key={pad.id}
+                      onMouseDown={() => handleItemMouseDown(pad.id)}
+                      onMouseEnter={() => handleItemMouseEnter(pad.id)}
+                      onMouseLeave={() => handleItemMouseLeave(pad.id)}
+                      onMouseUp={() => handleItemMouseUp(pad.id)}
                       style={{
-                        flex: 1,
-                        position: 'relative',
-                        background: isActive ? '#E2D9FF' : '#EAEAEA',
-                        border: '1px solid #C2C2CB',
-                        borderBottom: isActive ? `6px solid ${ACCENT_COLOR}` : '4px solid #B0B0BB',
-                        borderRadius: '0 0 6px 6px',
-                        margin: '0 1px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '6px 2px',
-                        outline: 'none',
-                        userSelect: 'none',
+                        ...figmaDrumBtnStyle,
+                        border: isActive ? `5px solid ${ACCENT_COLOR}` : `3px solid ${pad.strokeColor}`,
+                        boxShadow: isActive
+                          ? `0 0 26px ${ACCENT_COLOR}, 0 0 45px ${ACCENT_COLOR}90`
+                          : '0 4px 12px rgba(0,0,0,0.4)',
+                        transform: isActive ? 'scale(0.93)' : 'scale(1)',
                       }}
                     >
-                      {isOctaveStart ? (
-                        <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#666' }}>{k.note}</span>
-                      ) : <span />}
-
-                      <span style={whiteKeyBadgeStyle}>{k.label}</span>
+                      <div style={figmaInnerCapStyle}>
+                        {renderDrumIcon(pad.icon)}
+                        <span style={figmaKeyBadgeStyle}>{pad.key}</span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
-
-              {keyboardBlackKeys.map((k) => {
-                const isActive = displayNotes.includes(k.note);
-                const totalWhiteKeys = keyboardWhiteKeys.length;
-                const leftPct = ((k.posIndex + 0.65) / totalWhiteKeys) * 100;
-                const widthPct = (0.7 / totalWhiteKeys) * 100;
-
-                return (
-                  <button
-                    key={k.note}
-                    onMouseDown={() => triggerNoteOn(k.note)}
-                    onMouseUp={() => triggerNoteOff(k.note)}
-                    onMouseLeave={() => triggerNoteOff(k.note)}
-                    style={{
-                      position: 'absolute',
-                      left: `${leftPct}%`,
-                      top: 0,
-                      width: `${widthPct}%`,
-                      height: '60%',
-                      background: isActive ? ACCENT_COLOR : '#22222E',
-                      border: '1px solid #111',
-                      borderBottom: isActive ? '4px solid #5C25E6' : '3px solid #0D0D14',
-                      borderRadius: '0 0 5px 5px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'flex-start',
-                      alignItems: 'center',
-                      paddingTop: '6px',
-                      outline: 'none',
-                      zIndex: 10,
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
-                      userSelect: 'none',
-                    }}
-                  >
-                    <span style={blackKeyBadgeStyle}>{k.label}</span>
-                  </button>
-                );
-              })}
             </div>
-          </div>
-        )}
+          ) : isGuitarOrBass ? (
+            // SOUNDTRAP GUITAR CHORD SEQUENCER (Screenshot Recreation)
+            <div style={soundtrapGuitarWrapper}>
+              {/* Top Control Bar */}
+              <div style={soundtrapTopBar}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={stLabelStyle}>STYLE</span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {Array.from({ length: 16 }).map((_, i) => (
+                      <div key={i} style={stDotStyle(i === 3)} />
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={stLabelStyle}>STRUM</span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    {Array.from({ length: 16 }).map((_, i) => (
+                      <div key={i} style={stPillStyle(i === 2)} />
+                    ))}
+                  </div>
+                </div>
+
+                <span style={stAllBtn}>ALL ●</span>
+              </div>
+
+              {/* Main Fretboard & Chord Matrix */}
+              <div style={fretboardContainer}>
+                {/* String Header Column (Left) */}
+                <div style={stringLabelsColumn}>
+                  {guitarStrings.map((str, idx) => (
+                    <div key={idx} style={stringLabelBox}>
+                      <span>{str}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Chord Columns Grid (8 Columns) */}
+                <div style={chordColumnsGrid}>
+                  {guitarChords.map((chord) => {
+                    const isActive = displayNotes.includes(chord.id);
+                    return (
+                      <div
+                        key={chord.id}
+                        onMouseDown={() => handleItemMouseDown(chord.id, chord.notes)}
+                        onMouseEnter={() => handleItemMouseEnter(chord.id, chord.notes)}
+                        onMouseLeave={() => handleItemMouseLeave(chord.id)}
+                        onMouseUp={() => handleItemMouseUp(chord.id)}
+                        style={{
+                          ...chordColumnStyle,
+                          background: isActive ? '#8C6849' : chord.bg,
+                          boxShadow: isActive ? 'inset 0 0 15px rgba(255,255,255,0.4), 0 0 10px #D8C3A5' : 'none',
+                          transform: isActive ? 'scale(0.98)' : 'none',
+                        }}
+                      >
+                        {/* String lanes inside column */}
+                        {guitarStrings.map((_, sIdx) => {
+                          const hasNote = chord.activeStringIndices.includes(sIdx);
+                          return (
+                            <div key={sIdx} style={stringLaneStyle}>
+                              <div style={stringLineStyle} />
+                              {hasNote && (
+                                <div
+                                  style={{
+                                    ...noteBlockStyle,
+                                    background: isActive ? '#FFFFFF' : '#F5EBE0',
+                                    boxShadow: isActive ? '0 0 8px #FFF' : '0 1px 3px rgba(0,0,0,0.5)',
+                                  }}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {/* Footer Badge showing Chord + Hotkey */}
+                        <div style={{ ...chordFooterBadge, background: isActive ? '#221A15' : 'rgba(0,0,0,0.5)' }}>
+                          <span style={{ color: '#D8C3A5', fontWeight: 800 }}>{chord.key}</span>
+                          <span style={{ color: '#fff', fontSize: '8px' }}>{chord.name}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // PIANO KEYBOARD (SoundTrap Inspired C3-C5)
+            <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={keyboardContainerStyle}>
+                <div style={{ display: 'flex', width: '100%', height: '100%' }}>
+                  {keyboardWhiteKeys.map((k) => {
+                    const isActive = displayNotes.includes(k.note);
+                    const isOctaveStart = k.note.startsWith('C');
+                    return (
+                      <button
+                        key={k.note}
+                        onMouseDown={() => handleItemMouseDown(k.note)}
+                        onMouseEnter={() => handleItemMouseEnter(k.note)}
+                        onMouseLeave={() => handleItemMouseLeave(k.note)}
+                        onMouseUp={() => handleItemMouseUp(k.note)}
+                        style={{
+                          flex: 1,
+                          position: 'relative',
+                          background: isActive ? '#E2D9FF' : '#EAEAEA',
+                          border: '1px solid #C2C2CB',
+                          borderBottom: isActive ? `6px solid ${ACCENT_COLOR}` : '4px solid #B0B0BB',
+                          borderRadius: '0 0 6px 6px',
+                          margin: '0 1px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '6px 2px',
+                          outline: 'none',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {isOctaveStart ? (
+                          <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#666' }}>{k.note}</span>
+                        ) : <span />}
+
+                        <span style={whiteKeyBadgeStyle}>{k.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {keyboardBlackKeys.map((k) => {
+                  const isActive = displayNotes.includes(k.note);
+                  const totalWhiteKeys = keyboardWhiteKeys.length;
+                  const leftPct = ((k.posIndex + 0.65) / totalWhiteKeys) * 100;
+                  const widthPct = (0.7 / totalWhiteKeys) * 100;
+
+                  return (
+                    <button
+                      key={k.note}
+                      onMouseDown={() => handleItemMouseDown(k.note)}
+                      onMouseEnter={() => handleItemMouseEnter(k.note)}
+                      onMouseLeave={() => handleItemMouseLeave(k.note)}
+                      onMouseUp={() => handleItemMouseUp(k.note)}
+                      style={{
+                        position: 'absolute',
+                        left: `${leftPct}%`,
+                        top: 0,
+                        width: `${widthPct}%`,
+                        height: '60%',
+                        background: isActive ? ACCENT_COLOR : '#22222E',
+                        border: '1px solid #111',
+                        borderBottom: isActive ? `4px solid ${ACCENT_COLOR}` : '3px solid #0D0D14',
+                        borderRadius: '0 0 5px 5px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'flex-start',
+                        alignItems: 'center',
+                        paddingTop: '6px',
+                        outline: 'none',
+                        zIndex: 10,
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.4)',
+                        userSelect: 'none',
+                      }}
+                    >
+                      <span style={blackKeyBadgeStyle}>{k.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Side Hover Mode Toggle Button */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', paddingRight: '4px' }}>
+          <button
+            type="button"
+            onClick={() => setIsHoverPlayMode((prev) => !prev)}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px',
+              padding: '10px 8px',
+              borderRadius: '12px',
+              fontSize: '9px',
+              fontWeight: '800',
+              letterSpacing: '0.6px',
+              cursor: 'pointer',
+              border: isHoverPlayMode ? `2px solid ${ACCENT_COLOR}` : '1px solid rgba(255,255,255,0.18)',
+              background: isHoverPlayMode ? `${ACCENT_COLOR}25` : 'rgba(18, 19, 26, 0.85)',
+              color: isHoverPlayMode ? '#FFFFFF' : '#888888',
+              boxShadow: isHoverPlayMode ? `0 0 18px ${ACCENT_COLOR}77, 0 0 30px ${ACCENT_COLOR}40` : '0 4px 10px rgba(0,0,0,0.5)',
+              transform: isHoverPlayMode ? 'scale(1.02)' : 'scale(1)',
+              transition: 'all 0.15s cubic-bezier(0.2, 0.8, 0.4, 1)',
+              userSelect: 'none',
+              outline: 'none',
+              minWidth: '64px',
+            }}
+            title="Toggle Hover Mode: When ON, simply moving cursor over keys/pads triggers notes instantly!"
+          >
+            <span style={{ fontSize: '15px' }}>{isHoverPlayMode ? '⚡' : '🖱️'}</span>
+            <span style={{ textAlign: 'center', lineHeight: '1.1', color: isHoverPlayMode ? ACCENT_COLOR : '#AAA' }}>
+              {isHoverPlayMode ? 'HOVER ON' : 'HOVER OFF'}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -579,44 +686,81 @@ const clickLedStyle: React.CSSProperties = {
   border: '1px solid rgba(255, 82, 82, 0.3)',
 };
 
-const freedrumArcGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(4, 1fr)',
-  gridTemplateRows: 'repeat(3, 1fr)',
-  gap: '8px',
-  flex: 1,
+const renderDrumIcon = (icon: string) => {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FFFFFF" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      {icon === 'snare' || icon === 'tom' ? (
+        <>
+          <rect x="4" y="8" width="16" height="8" rx="2" />
+          <line x1="4" y1="12" x2="20" y2="12" strokeDasharray="2 2" />
+        </>
+      ) : icon === 'hihat' || icon === 'crash' ? (
+        <>
+          <ellipse cx="12" cy="9.5" rx="7.5" ry="2.5" />
+          <line x1="12" y1="12" x2="12" y2="18" />
+        </>
+      ) : icon === 'kick' ? (
+        <>
+          <circle cx="12" cy="11" r="6" />
+          <path d="M8 17l-2 3M16 17l2 3" />
+        </>
+      ) : (
+        <circle cx="12" cy="12" r="5" />
+      )}
+    </svg>
+  );
 };
 
-const freedrumPadStyle: React.CSSProperties = {
-  borderRadius: '50%',
-  border: '2px solid',
-  cursor: 'pointer',
+/* --- FIGMA DRUM STYLES (Image 1, 2 & 3) --- */
+const figmaDrumWrapper: React.CSSProperties = {
+  display: 'flex',
+  width: '100%',
+  height: '100%',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  userSelect: 'none',
+};
+
+const figmaDrumRow: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  outline: 'none',
-  transition: 'all 0.08s ease',
-  padding: 0,
+  gap: '18px',
+  width: '100%',
+  height: '100%',
 };
 
-const innerRingStyle: React.CSSProperties = {
-  width: '82%',
-  height: '82%',
+const figmaDrumBtnStyle: React.CSSProperties = {
+  width: '76px',
+  height: '76px',
   borderRadius: '50%',
-  border: '1px dashed',
+  background: '#14151B',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  outline: 'none',
+  padding: 0,
+  transition: 'all 0.08s cubic-bezier(0.2, 0.8, 0.4, 1)',
+};
+
+const figmaInnerCapStyle: React.CSSProperties = {
+  width: '84%',
+  height: '84%',
+  borderRadius: '50%',
+  background: 'radial-gradient(circle at 35% 35%, #2B2E38, #181920)',
+  border: '2px solid #0D0E12',
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
+  boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.15), inset 0 -2px 4px rgba(0,0,0,0.6)',
 };
 
-const padKeyBadgeStyle: React.CSSProperties = {
+const figmaKeyBadgeStyle: React.CSSProperties = {
   fontSize: '10px',
-  fontWeight: '900',
-  color: '#fff',
-  background: 'rgba(0, 0, 0, 0.6)',
-  padding: '1px 6px',
-  borderRadius: '8px',
-  border: '1px solid rgba(255, 255, 255, 0.2)',
+  fontWeight: '800',
+  color: '#BBB',
   marginTop: '2px',
 };

@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowRight, Copy, Check } from 'lucide-react';
 import InstrumentAsciiCanvas, { InstrumentTheme, INSTRUMENT_THEMES } from './InstrumentAsciiCanvas';
 
-interface LobbyProps {
-  onJoin: (
+export interface LandingPageProps {
+  onJoin?: (
     roomId: string,
     userName: string,
     preferredInstrument?: string,
@@ -20,10 +20,14 @@ interface InstrumentOption {
 }
 
 const AVAILABLE_INSTRUMENTS: InstrumentOption[] = [
-  { id: 'DRUM', name: 'DRUM KIT', icon: '🥁' },
   { id: 'GUITAR', name: 'GUITAR', icon: '🎸' },
   { id: 'KEYBOARD', name: 'KEYBOARD', icon: '🎹' },
-  { id: 'TRUMPET', name: 'TRUMPET / BRASS', icon: '🎺' },
+  { id: 'DRUM', name: 'DRUM KIT', icon: '🥁' },
+  { id: 'SITAR', name: 'SITAR', icon: '🪕' },
+  { id: 'FLUTE', name: 'FLUTE', icon: '🪈' },
+  { id: 'TRUMPET', name: 'TRUMPET', icon: '🎺' },
+  { id: 'SAXOPHONE', name: 'SAXOPHONE', icon: '🎷' },
+  { id: 'VIOLIN', name: 'VIOLIN', icon: '🎻' },
 ];
 
 function generateRandomCode(): string {
@@ -31,7 +35,7 @@ function generateRandomCode(): string {
   return `JAM-${num}`;
 }
 
-export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
+export default function LandingPage({ onJoin, isLoading = false }: LandingPageProps) {
   const [activeTab, setActiveTab] = useState<'create' | 'join'>('create');
   const [displayName, setDisplayName] = useState('');
   
@@ -126,23 +130,27 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
   const handleCreateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!createdRoomCode.trim()) return;
-    onJoin(
-      createdRoomCode.trim(),
-      displayName.trim() || 'Band Leader',
-      assignmentMode === 'custom' ? creatorSelectedInst : undefined,
-      assignmentMode
-    );
+    if (onJoin) {
+      onJoin(
+        createdRoomCode.trim(),
+        displayName.trim() || 'Band Leader',
+        assignmentMode === 'custom' ? creatorSelectedInst : undefined,
+        assignmentMode
+      );
+    }
   };
 
   const handleJoinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!joinRoomCode.trim()) return;
-    onJoin(
-      joinRoomCode.trim(),
-      displayName.trim() || 'Musician',
-      isJoinRoomCustom ? joinSelectedInst : undefined,
-      undefined
-    );
+    if (onJoin) {
+      onJoin(
+        joinRoomCode.trim(),
+        displayName.trim() || 'Musician',
+        isJoinRoomCustom ? joinSelectedInst : undefined,
+        undefined
+      );
+    }
   };
 
   const textCol = currentTheme.textColor;
@@ -151,9 +159,9 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
 
   return (
     <div style={viewportWrapper}>
-      <div style={centeredCluster}>
+      <div className="landing-centered-cluster" style={centeredCluster}>
         {/* LEFT PANE: DYNAMIC COLORED BOX WITH MATCHING 40PX DOT ASCII SHADOW */}
-        <div style={whiteBoxWrapper}>
+        <div className="landing-white-box" style={whiteBoxWrapper}>
           {/* Dynamic 40px ASCII Dot Matrix Shadow Layer */}
           <div
             style={{
@@ -178,7 +186,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
             ref={boxRef}
             style={{
               ...themeCardStyle,
-              background: cardBg,
+              backgroundColor: cardBg,
               color: textCol,
               borderColor: textCol,
             }}
@@ -229,7 +237,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
                     style={{
                       ...themeInputStyle,
                       borderColor: textCol,
-                      color: textCol,
+                      color: '#000000',
                     }}
                     maxLength={24}
                   />
@@ -248,7 +256,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
                         ...themeInputStyle,
                         paddingRight: '48px',
                         borderColor: textCol,
-                        color: textCol,
+                        color: '#000000',
                       }}
                       required
                     />
@@ -362,7 +370,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
                     style={{
                       ...themeInputStyle,
                       borderColor: textCol,
-                      color: textCol,
+                      color: '#000000',
                     }}
                     maxLength={24}
                   />
@@ -380,7 +388,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
                     style={{
                       ...themeInputStyle,
                       borderColor: textCol,
-                      color: textCol,
+                      color: '#000000',
                     }}
                     required
                   />
@@ -440,8 +448,8 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
           </div>
         </div>
 
-        {/* RIGHT PANE: 2D MULTI-COLORED DOT MATRIX CANVAS */}
-        <div style={artPaneStyle}>
+        {/* RIGHT PANE: 2D MULTI-COLORED DOT MATRIX CANVAS (Hidden on Mobile) */}
+        <div className="ascii-art-pane" style={artPaneStyle}>
           <InstrumentAsciiCanvas onThemeChange={setCurrentTheme} />
         </div>
       </div>
@@ -492,7 +500,7 @@ const themeCardStyle: React.CSSProperties = {
   boxSizing: 'border-box',
   display: 'flex',
   flexDirection: 'column',
-  transition: 'background 0.35s ease, color 0.35s ease, border-color 0.35s ease',
+  transition: 'background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease',
 };
 
 const themeTitleStyle: React.CSSProperties = {
@@ -549,7 +557,8 @@ const themeLabelStyle: React.CSSProperties = {
 
 const themeInputStyle: React.CSSProperties = {
   width: '100%',
-  background: 'rgba(255, 255, 255, 0.92)',
+  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+  color: '#000000',
   border: '2px solid',
   borderRadius: '4px',
   padding: '12px 14px',
@@ -557,7 +566,7 @@ const themeInputStyle: React.CSSProperties = {
   fontFamily: JUA_FONT,
   outline: 'none',
   boxSizing: 'border-box',
-  transition: 'border-color 0.35s ease, color 0.35s ease',
+  transition: 'border-color 0.35s ease',
 };
 
 const codeWithCopyWrapper: React.CSSProperties = {
