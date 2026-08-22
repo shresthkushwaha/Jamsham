@@ -21,11 +21,9 @@ class AudioEngine {
   private drumNoise: Tone.NoiseSynth | null = null;
   private drumMetal: Tone.MetalSynth | null = null;
 
-  private bassSynth: Tone.MonoSynth | null = null;
-  private leadSynth: Tone.PolySynth | null = null;
-  private padSynth: Tone.PolySynth | null = null;
-  private fxSynth: Tone.PluckSynth | null = null;
-  private fxNoise: Tone.NoiseSynth | null = null;
+  private guitarSynth: Tone.PluckSynth | null = null;
+  private keyboardSynth: Tone.PolySynth | null = null;
+  private trumpetSynth: Tone.PolySynth | null = null;
 
   public async init() {
     if (this.isInitialized) return;
@@ -76,7 +74,6 @@ class AudioEngine {
     }).connect(this.masterGain);
 
     this.drumMetal = new Tone.MetalSynth({
-      frequency: 200,
       envelope: { attack: 0.001, decay: 0.1, release: 0.01 },
       harmonicity: 5.1,
       modulationIndex: 32,
@@ -84,48 +81,35 @@ class AudioEngine {
       octaves: 1.5,
     }).connect(this.masterGain);
 
-    // 2. BASS
-    this.bassSynth = new Tone.MonoSynth({
-      oscillator: { type: 'sawtooth' },
-      filter: { Q: 3, type: 'lowpass', rolloff: -24 },
-      envelope: { attack: 0.02, decay: 0.3, sustain: 0.6, release: 0.8 },
-      filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.8, baseFrequency: 80, octaves: 3.5 },
-    }).connect(this.masterGain);
-
-    // 3. LEAD
-    this.leadSynth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle8' },
-      envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.6 },
-    });
-    this.leadSynth.connect(this.effectsReverb);
-    this.leadSynth.connect(this.effectsDelay);
-    this.leadSynth.connect(this.masterGain);
-
-    // 4. AMBIENT PAD
-    this.padSynth = new Tone.PolySynth(Tone.FMSynth, {
-      harmonicity: 2,
-      modulationIndex: 3,
-      oscillator: { type: 'sine' },
-      envelope: { attack: 0.4, decay: 0.5, sustain: 0.9, release: 2.0 },
-      modulation: { type: 'triangle' },
-      modulationEnvelope: { attack: 0.2, decay: 0.4, sustain: 0.8, release: 1.5 },
-    });
-    this.padSynth.connect(this.effectsReverb);
-    this.padSynth.connect(this.masterGain);
-
-    // 5. FX & GLITCH
-    this.fxSynth = new Tone.PluckSynth({
-      attackNoise: 1,
+    // 2. GUITAR
+    this.guitarSynth = new Tone.PluckSynth({
+      attackNoise: 1.5,
       dampening: 4000,
       resonance: 0.9,
     });
-    this.fxSynth.connect(this.effectsDelay);
-    this.fxSynth.connect(this.masterGain);
+    this.guitarSynth.connect(this.effectsReverb);
+    this.guitarSynth.connect(this.masterGain);
 
-    this.fxNoise = new Tone.NoiseSynth({
-      noise: { type: 'pink' },
-      envelope: { attack: 0.01, decay: 0.5, sustain: 0 },
-    }).connect(this.effectsReverb);
+    // 3. KEYBOARD
+    this.keyboardSynth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle8' },
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.7, release: 0.6 },
+    });
+    this.keyboardSynth.connect(this.effectsReverb);
+    this.keyboardSynth.connect(this.effectsDelay);
+    this.keyboardSynth.connect(this.masterGain);
+
+    // 4. TRUMPET
+    this.trumpetSynth = new Tone.PolySynth(Tone.FMSynth, {
+      harmonicity: 1.01,
+      modulationIndex: 10,
+      oscillator: { type: 'sawtooth' },
+      envelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.3 },
+      modulation: { type: 'square' },
+      modulationEnvelope: { attack: 0.1, decay: 0.2, sustain: 0.9, release: 0.3 },
+    });
+    this.trumpetSynth.connect(this.effectsReverb);
+    this.trumpetSynth.connect(this.masterGain);
 
     this.isInitialized = true;
     console.log('[AudioEngine] Initialized all instrument engines successfully');
@@ -147,26 +131,29 @@ class AudioEngine {
     try {
       const now = Tone.now();
       switch (instrumentId) {
-        case 'DRUMS':
+        case 'DRUM':
           this.playDrumSound(noteOrType as string, velocity, now);
           break;
-        case 'BASS':
-          if (this.bassSynth && typeof noteOrType === 'string') {
-            this.bassSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
+        case 'GUITAR':
+          if (this.guitarSynth) {
+            if (Array.isArray(noteOrType)) {
+              noteOrType.forEach((n, idx) => {
+                this.guitarSynth?.triggerAttack(n, now + idx * 0.03);
+              });
+            } else if (typeof noteOrType === 'string') {
+              this.guitarSynth.triggerAttack(noteOrType, now);
+            }
           }
           break;
-        case 'LEAD':
-          if (this.leadSynth) {
-            this.leadSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
+        case 'KEYBOARD':
+          if (this.keyboardSynth) {
+            this.keyboardSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
           }
           break;
-        case 'PAD':
-          if (this.padSynth) {
-            this.padSynth.triggerAttackRelease(noteOrType, duration || '2n', now, velocity * 0.7);
+        case 'TRUMPET':
+          if (this.trumpetSynth) {
+            this.trumpetSynth.triggerAttackRelease(noteOrType, duration, now, velocity);
           }
-          break;
-        case 'FX':
-          this.playFxSound(noteOrType as string, velocity, now);
           break;
         default:
           break;
@@ -215,40 +202,16 @@ class AudioEngine {
     }
   }
 
-  private playFxSound(type: string, velocity: number, time: number) {
-    switch (type.toUpperCase()) {
-      case 'LASER':
-        this.bassSynth?.triggerAttackRelease('C5', '32n', time, velocity);
-        break;
-      case 'ZAP':
-        this.fxSynth?.triggerAttackRelease('G4', '16n', time, velocity);
-        break;
-      case 'SUB DROP':
-        this.bassSynth?.triggerAttackRelease('A0', '1n', time, velocity);
-        break;
-      case 'SWEEP':
-        this.fxNoise?.triggerAttackRelease('2n', time, velocity * 0.7);
-        break;
-      case 'CHIME':
-        this.leadSynth?.triggerAttackRelease(['E5', 'B5'], '8n', time, velocity);
-        break;
-      case 'GLITCH':
-      default:
-        this.fxSynth?.triggerAttackRelease('C3', '32n', time, velocity);
-    }
-  }
-
   // Release note for sustained keys
   public stopNote(instrumentId: string, note?: string) {
     if (!this.isInitialized) return;
     try {
-      if (instrumentId === 'BASS' && this.bassSynth) {
-        this.bassSynth.triggerRelease();
-      } else if (instrumentId === 'LEAD' && this.leadSynth && note) {
-        this.leadSynth.triggerRelease(note);
-      } else if (instrumentId === 'PAD' && this.padSynth && note) {
-        this.padSynth.triggerRelease(note);
+      if (instrumentId === 'KEYBOARD' && this.keyboardSynth && note) {
+        this.keyboardSynth.triggerRelease(note);
+      } else if (instrumentId === 'TRUMPET' && this.trumpetSynth && note) {
+        this.trumpetSynth.triggerRelease(note);
       }
+      // Guitar is plucked, doesn't need explicit stop unless we want to damp it.
     } catch {
       // Ignored
     }
@@ -270,7 +233,7 @@ class AudioEngine {
     return this.isFilterOn;
   }
 
-  // Recording Session (Phase 5)
+  // Recording Session
   public startRecording(): boolean {
     if (!this.recorderDestination?.stream) {
       console.warn('[AudioEngine] No media stream available for recording');
@@ -320,4 +283,3 @@ class AudioEngine {
 }
 
 export const audioEngine = new AudioEngine();
-

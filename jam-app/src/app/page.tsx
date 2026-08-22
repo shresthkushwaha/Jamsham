@@ -1,19 +1,11 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { audioEngine } from '@/lib/audioEngine';
-import { WebRTCManager, User, ChatMessage, NoteEvent } from '@/lib/webrtcManager';
+import { WebRTCManager, User, NoteEvent } from '@/lib/webrtcManager';
 import Lobby from '@/components/Lobby';
-import Sidebar from '@/components/Sidebar';
-import RoomHeader from '@/components/RoomHeader';
 import VideoGrid2x2 from '@/components/VideoGrid2x2';
 import BottomInstrumentPanel from '@/components/BottomInstrumentPanel';
-import Visualizer from '@/components/Visualizer';
-import ChatDrawer from '@/components/ChatDrawer';
-import DrumPad from '@/components/DrumPad';
-import BassSynth from '@/components/BassSynth';
-import LeadKeyboard from '@/components/LeadKeyboard';
-import AmbientPad from '@/components/AmbientPad';
-import FxPercussion from '@/components/FxPercussion';
+import { Copy, Activity, Play, Square, Users, Mic, MicOff, Video, VideoOff, Sliders, LogOut } from 'lucide-react';
 
 export default function JamRoomPage() {
   const [isInRoom, setIsInRoom] = useState(false);
@@ -23,9 +15,6 @@ export default function JamRoomPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [bpm, setBpm] = useState(120);
 
-  // Sidebar navigation tabs: 'stage' (2x2 grid) | 'rack' (all instruments) | 'chat' | 'help'
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'stage' | 'rack' | 'chat' | 'help'>('stage');
-
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [volumeLevels, setVolumeLevels] = useState<Record<string, number>>({});
@@ -33,8 +22,8 @@ export default function JamRoomPage() {
 
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isFilterOn, setIsFilterOn] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const webrtcRef = useRef<WebRTCManager | null>(null);
 
@@ -42,17 +31,11 @@ export default function JamRoomPage() {
   const handleJoin = async (targetRoomId: string, userName: string) => {
     setIsLoading(true);
     try {
-      // 1. Start audio engine
       await audioEngine.init();
-
-      // 2. Start WebRTC & Sockets
       const manager = new WebRTCManager();
       webrtcRef.current = manager;
 
-      manager.onUserJoined = (newUser, allUsers) => {
-        setUsers(allUsers);
-      };
-
+      manager.onUserJoined = (newUser, allUsers) => setUsers(allUsers);
       manager.onUserLeft = (leftSocketId, remainingUsers) => {
         setUsers(remainingUsers);
         setRemoteStreams((prev) => {
@@ -61,22 +44,18 @@ export default function JamRoomPage() {
           return next;
         });
       };
-
       manager.onRemoteStream = (socketId, stream) => {
         setRemoteStreams((prev) => new Map(prev).set(socketId, stream));
       };
 
-      // Remote Note triggers
       manager.onNotePlay = (event: NoteEvent) => {
         audioEngine.playNote(event.instrument, event.note, event.duration, event.velocity);
-
         if (event.fromSocketId) {
           const noteLabel = Array.isArray(event.note) ? event.note.join('+') : event.note;
           setActiveNotesByUser((prev) => ({
             ...prev,
             [event.fromSocketId!]: [...(prev[event.fromSocketId!] || []), noteLabel],
           }));
-
           setTimeout(() => {
             setActiveNotesByUser((prev) => ({
               ...prev,
@@ -97,17 +76,8 @@ export default function JamRoomPage() {
         );
       };
 
-      manager.onBpmUpdated = (newBpm) => {
-        setBpm(newBpm);
-      };
-
-      manager.onChatMessage = (msg) => {
-        setMessages((prev) => [...prev, msg]);
-      };
-
-      manager.onVolumeLevels = (levels) => {
-        setVolumeLevels(levels);
-      };
+      manager.onBpmUpdated = (newBpm) => setBpm(newBpm);
+      manager.onVolumeLevels = (levels) => setVolumeLevels(levels);
 
       const result = await manager.connectAndJoin(targetRoomId, userName);
       setLocalUser(result.user);
@@ -134,18 +104,11 @@ export default function JamRoomPage() {
     setActiveNotesByUser({});
   };
 
-  // Local note playing
-  const currentInstrumentId = localUser?.instrument?.id || 'DRUMS';
+  const currentInstrumentId = localUser?.instrument?.id || 'KEYBOARD';
 
   const handleLocalPlay = (noteOrSound: string | string[], velocity: number = 0.8) => {
     audioEngine.playNote(currentInstrumentId, noteOrSound, '8n', velocity);
-
-    // Broadcast over network
-    webrtcRef.current?.emitNotePlay({
-      instrument: currentInstrumentId,
-      note: noteOrSound,
-      velocity,
-    });
+    webrtcRef.current?.emitNotePlay({ instrument: currentInstrumentId, note: noteOrSound, velocity });
 
     if (localUser) {
       const label = Array.isArray(noteOrSound) ? noteOrSound.join('+') : noteOrSound;
@@ -165,10 +128,7 @@ export default function JamRoomPage() {
   const handleLocalStop = (noteOrSound: string | string[]) => {
     const singleNote = Array.isArray(noteOrSound) ? noteOrSound[0] : noteOrSound;
     audioEngine.stopNote(currentInstrumentId, singleNote);
-    webrtcRef.current?.emitNoteStop({
-      instrument: currentInstrumentId,
-      note: noteOrSound,
-    });
+    webrtcRef.current?.emitNoteStop({ instrument: currentInstrumentId, note: noteOrSound });
   };
 
   const handleToggleMute = () => {
@@ -183,22 +143,34 @@ export default function JamRoomPage() {
     webrtcRef.current?.toggleVideo(next);
   };
 
-  const handleBpmChange = (newBpm: number) => {
+  const handleToggleFilter = () => {
+    const next = audioEngine.toggleFilter();
+    setIsFilterOn(next);
+  };
+
+  const handleBpmChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newBpm = parseInt(e.target.value);
     setBpm(newBpm);
     webrtcRef.current?.setBpm(newBpm);
   };
 
-  const handleSendMessage = (text: string) => {
-    if (localUser) {
-      webrtcRef.current?.sendChatMessage(text, localUser.userName);
-    }
-  };
-
-  const handleSidebarTabSelect = (tab: 'stage' | 'rack' | 'chat' | 'help') => {
-    if (tab === 'chat') {
-      setIsChatOpen((o) => !o);
+  const toggleRecording = async () => {
+    if (isRecording) {
+      const blob = await audioEngine.stopRecording();
+      setIsRecording(false);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `jam-session-${roomId}-${new Date().getTime()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
     } else {
-      setActiveSidebarTab(tab);
+      const started = audioEngine.startRecording();
+      if (started) setIsRecording(true);
     }
   };
 
@@ -208,138 +180,120 @@ export default function JamRoomPage() {
 
   return (
     <div style={appFrameStyle}>
-      {/* 1. Left Slim Sidebar [*] [#] [@] [?] */}
-      <Sidebar
-        activeTab={activeSidebarTab}
-        onSelectTab={handleSidebarTabSelect}
-        unreadChatCount={messages.length}
-      />
+      {/* LEFT COLUMN: Video Grid (2x2) + Aligned Instrument Surface */}
+      <main style={leftColumnStyle}>
+        <div style={videoStageWrapper}>
+          <VideoGrid2x2
+            users={users}
+            localUser={localUser}
+            localStream={localStream}
+            remoteStreams={remoteStreams}
+            volumeLevels={volumeLevels}
+            activeNotesByUser={activeNotesByUser}
+            onInvite={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert('Room invite link copied to clipboard!');
+            }}
+          />
+        </div>
 
-      {/* 2. Main Workspace Layout */}
-      <div style={workspaceContainer}>
-        {/* Top Header: [ ROOM: ... ] BPM: [ 120 ] REC: [ ... ] [X] */}
-        <RoomHeader
-          roomId={roomId}
-          userCount={users.length}
-          bpm={bpm}
-          onBpmChange={handleBpmChange}
-          onLeave={handleLeave}
-        />
+        <div style={instrumentPanelWrapper}>
+          <BottomInstrumentPanel
+            instrumentId={currentInstrumentId}
+            instrumentName={localUser?.instrument?.name || 'Keyboard / Synth'}
+            instrumentColor={localUser?.instrument?.color || '#7C4DFF'}
+            onPlay={handleLocalPlay}
+            onStop={handleLocalStop}
+            activeNotes={activeNotesByUser[localUser?.socketId || ''] || []}
+          />
+        </div>
+      </main>
 
-        {/* Center Stage Area: 2x2 Video Grid (Variation 3) */}
-        <main style={mainStageArea}>
-          {activeSidebarTab === 'stage' && (
-            <div style={stageLayout}>
-              {/* 2x2 Video Grid */}
-              <div style={{ flex: 1 }}>
-                <VideoGrid2x2
-                  users={users}
-                  localUser={localUser}
-                  localStream={localStream}
-                  remoteStreams={remoteStreams}
-                  volumeLevels={volumeLevels}
-                  activeNotesByUser={activeNotesByUser}
-                  onInvite={() => {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Room invite link copied to clipboard!');
-                  }}
-                />
-              </div>
+      {/* RIGHT COLUMN: Room Details, Participants, Shifted Control Buttons */}
+      <aside style={rightSidebarStyle}>
+        {/* Room Details Card */}
+        <div style={cardStyle}>
+          <h2 style={cardHeaderStyle}>
+            <Activity size={16} color="#7C4DFF" />
+            Room Details
+          </h2>
 
-              {/* Right Side DAW Visualizer Rack */}
-              <div style={dawSideRack}>
-                <Visualizer />
-                <div style={bandInfoCard}>
-                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>ACTIVE BAND ROLES</span>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
-                    {users.map((u) => (
-                      <div key={u.socketId} style={bandRoleRow}>
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>
-                          {u.userName} {u.socketId === localUser?.socketId ? '(YOU)' : ''}
-                        </span>
-                        <span
-                          style={{
-                            ...roleTagSmall,
-                            color: u.instrument?.color,
-                            borderColor: u.instrument?.color,
-                            background: `${u.instrument?.color}15`,
-                          }}
-                        >
-                          {u.instrument?.name}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+          <div style={{ marginBottom: '12px' }}>
+            <span style={labelStyle}>ROOM LINK</span>
+            <div style={linkBoxStyle}>
+              <span style={linkTextStyle}>{roomId}</span>
+              <button onClick={() => navigator.clipboard.writeText(window.location.href)} style={iconBtnStyle}>
+                <Copy size={14} color="#aaa" />
+              </button>
             </div>
-          )}
+          </div>
 
-          {activeSidebarTab === 'rack' && (
-            <div style={rackViewContainer}>
-              <h2 style={{ fontSize: '18px', color: '#00E676', marginBottom: '16px' }}>
-                🎛 Full Studio Instrument Rack
-              </h2>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
-                <DrumPad onPlay={(s) => handleLocalPlay(s)} />
-                <BassSynth onPlay={(n) => handleLocalPlay(n)} onStop={(n) => handleLocalStop(n)} />
-                <LeadKeyboard onPlay={(n) => handleLocalPlay(n)} onStop={(n) => handleLocalStop(n)} />
-                <AmbientPad onPlay={(n) => handleLocalPlay(n)} onStop={(n) => handleLocalStop(n)} />
-                <FxPercussion onPlay={(f) => handleLocalPlay(f)} />
+          <div style={{ marginBottom: '12px' }}>
+            <span style={labelStyle}>BPM / TEMPO: {bpm}</span>
+            <input type="range" min="60" max="200" value={bpm} onChange={handleBpmChange} style={rangeStyle} />
+          </div>
+
+          <button onClick={toggleRecording} style={recordBtnStyle(isRecording)}>
+            {isRecording ? <Square size={14} /> : <Play size={14} />}
+            {isRecording ? 'STOP RECORDING' : 'RECORD SESSION'}
+          </button>
+        </div>
+
+        {/* Participants Card */}
+        <div style={{ ...cardStyle, flex: 1, overflowY: 'auto' }}>
+          <h2 style={cardHeaderStyle}>
+            <Users size={16} color="#00B0FF" />
+            Participants ({users.length})
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {users.map((u) => (
+              <div key={u.socketId} style={participantRowStyle}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#fff' }}>
+                  {u.userName} {u.socketId === localUser?.socketId ? '(YOU)' : ''}
+                </span>
+                <span style={instBadgeStyle(u.instrument?.color || '#7C4DFF')}>
+                  {u.instrument?.name}
+                </span>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
+        </div>
 
-          {activeSidebarTab === 'help' && (
-            <div style={helpContainer}>
-              <h2 style={{ fontSize: '18px', color: '#00E676', marginBottom: '16px' }}>
-                📖 Stage Keyboard Shortcuts & Guide
-              </h2>
-              <div style={helpGrid}>
-                <div style={helpCard}>
-                  <h3 style={{ color: '#FF5722', fontSize: '14px', marginBottom: '8px' }}>🥁 Drum Kit</h3>
-                  <p style={helpText}>Keys <strong>1-3</strong>, <strong>Q-E</strong>, <strong>A-D</strong> trigger Kick, Snare, Hat, Toms, Crash, Clap, Shaker, Cowbell.</p>
-                </div>
-                <div style={helpCard}>
-                  <h3 style={{ color: '#E040FB', fontSize: '14px', marginBottom: '8px' }}>🎸 Sub Bass</h3>
-                  <p style={helpText}>Keys <strong>A, S, D, F, G, H, J, K, L, ;</strong> trigger C1 to E2 with octave shift controls.</p>
-                </div>
-                <div style={helpCard}>
-                  <h3 style={{ color: '#00E676', fontSize: '14px', marginBottom: '8px' }}>🎹 Lead Synth</h3>
-                  <p style={helpText}>White keys <strong>A-K</strong> and black keys <strong>W, E, T, Y, U</strong> for smooth polyphonic leads.</p>
-                </div>
-                <div style={helpCard}>
-                  <h3 style={{ color: '#00B0FF', fontSize: '14px', marginBottom: '8px' }}>🌊 Ambient Pad</h3>
-                  <p style={helpText}>Keys <strong>1-8</strong> toggle lush FM chord layers (Am9, Fmaj7, Cmaj9, etc.).</p>
-                </div>
-              </div>
-            </div>
-          )}
-        </main>
+        {/* Controls Panel (Shifted from sidebar to bottom right) */}
+        <div style={controlsCardStyle}>
+          <button
+            onClick={handleToggleMute}
+            style={circleControlBtnStyle(isMuted, '#FF5252')}
+            title="Toggle Microphone"
+          >
+            {isMuted ? <MicOff size={18} color="#FF5252" /> : <Mic size={18} color="#00E676" />}
+          </button>
 
-        {/* Bottom Instrument Control Panel & 3 Action Buttons (Variation 3) */}
-        <BottomInstrumentPanel
-          instrumentId={currentInstrumentId}
-          instrumentName={localUser?.instrument?.name || 'Drum Kit'}
-          instrumentColor={localUser?.instrument?.color || '#FF5722'}
-          onPlay={handleLocalPlay}
-          onStop={handleLocalStop}
-          activeNotes={activeNotesByUser[localUser?.socketId || ''] || []}
-          isMuted={isMuted}
-          isVideoOff={isVideoOff}
-          onToggleMute={handleToggleMute}
-          onToggleVideo={handleToggleVideo}
-        />
-      </div>
+          <button
+            onClick={handleToggleVideo}
+            style={circleControlBtnStyle(isVideoOff, '#FF5252')}
+            title="Toggle Camera"
+          >
+            {isVideoOff ? <VideoOff size={18} color="#FF5252" /> : <Video size={18} color="#00B0FF" />}
+          </button>
 
-      {/* Slide-out Chat Drawer */}
-      <ChatDrawer
-        messages={messages}
-        users={users}
-        onSendMessage={handleSendMessage}
-        isOpen={isChatOpen}
-        onToggle={() => setIsChatOpen((o) => !o)}
-      />
+          <button
+            onClick={handleToggleFilter}
+            style={circleControlBtnStyle(isFilterOn, '#FFD600')}
+            title="Toggle Master FX"
+          >
+            <Sliders size={18} color={isFilterOn ? '#FFD600' : '#aaa'} />
+          </button>
+
+          <button
+            onClick={handleLeave}
+            style={exitBtnStyle}
+            title="Leave Room"
+          >
+            <LogOut size={16} color="#FF5252" />
+          </button>
+        </div>
+      </aside>
     </div>
   );
 }
@@ -352,85 +306,163 @@ const appFrameStyle: React.CSSProperties = {
   color: '#fff',
   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   overflow: 'hidden',
+  padding: '16px',
+  gap: '16px',
+  boxSizing: 'border-box',
 };
 
-const workspaceContainer: React.CSSProperties = {
+const leftColumnStyle: React.CSSProperties = {
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
-  height: '100vh',
+  gap: '16px',
+  height: '100%',
   overflow: 'hidden',
 };
 
-const mainStageArea: React.CSSProperties = {
+const videoStageWrapper: React.CSSProperties = {
   flex: 1,
-  padding: '12px 16px',
-  overflowY: 'auto',
+  minHeight: '0',
   display: 'flex',
-  flexDirection: 'column',
 };
 
-const stageLayout: React.CSSProperties = {
+const instrumentPanelWrapper: React.CSSProperties = {
+  height: '210px',
+  width: '100%',
+};
+
+const rightSidebarStyle: React.CSSProperties = {
+  width: '280px',
   display: 'flex',
+  flexDirection: 'column',
   gap: '16px',
   height: '100%',
 };
 
-const dawSideRack: React.CSSProperties = {
-  width: '280px',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '12px',
-  flexShrink: 0,
-};
-
-const bandInfoCard: React.CSSProperties = {
+const cardStyle: React.CSSProperties = {
   background: '#12121c',
-  borderRadius: '12px',
+  padding: '16px',
+  borderRadius: '14px',
   border: '1px solid rgba(255, 255, 255, 0.08)',
-  padding: '12px',
 };
 
-const bandRoleRow: React.CSSProperties = {
+const cardHeaderStyle: React.CSSProperties = {
+  fontSize: '13px',
+  fontWeight: '700',
+  color: '#fff',
+  marginBottom: '12px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '10px',
+  fontWeight: '700',
+  color: '#777',
+  display: 'block',
+  marginBottom: '4px',
+};
+
+const linkBoxStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  background: '#181824',
+  borderRadius: '8px',
+  padding: '6px 10px',
+  border: '1px solid rgba(255, 255, 255, 0.06)',
+};
+
+const linkTextStyle: React.CSSProperties = {
+  flex: 1,
+  fontSize: '12px',
+  fontWeight: '600',
+  color: '#7C4DFF',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+};
+
+const iconBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  padding: 0,
+};
+
+const rangeStyle: React.CSSProperties = {
+  width: '100%',
+  accentColor: '#7C4DFF',
+};
+
+const recordBtnStyle = (isRecording: boolean): React.CSSProperties => ({
+  width: '100%',
+  padding: '10px',
+  borderRadius: '8px',
+  border: 'none',
+  background: isRecording ? 'rgba(255, 82, 82, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+  color: isRecording ? '#FF5252' : '#fff',
+  fontWeight: 'bold',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '8px',
+  cursor: 'pointer',
+  fontSize: '11px',
+});
+
+const participantRowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
+  padding: '8px 10px',
+  background: '#181824',
+  borderRadius: '8px',
+  border: '1px solid rgba(255, 255, 255, 0.04)',
 };
 
-const roleTagSmall: React.CSSProperties = {
+const instBadgeStyle = (color: string): React.CSSProperties => ({
   fontSize: '10px',
   fontWeight: 'bold',
-  padding: '2px 6px',
-  borderRadius: '4px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
-};
+  padding: '2px 8px',
+  borderRadius: '10px',
+  border: '1px solid',
+  color: color,
+  borderColor: color,
+  background: `${color}18`,
+});
 
-const rackViewContainer: React.CSSProperties = {
-  padding: '16px',
-  overflowY: 'auto',
-};
-
-const helpContainer: React.CSSProperties = {
-  padding: '16px',
-};
-
-const helpGrid: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, 1fr)',
-  gap: '16px',
-  maxWidth: '700px',
-};
-
-const helpCard: React.CSSProperties = {
+const controlsCardStyle: React.CSSProperties = {
   background: '#12121c',
+  borderRadius: '14px',
   border: '1px solid rgba(255, 255, 255, 0.08)',
-  borderRadius: '12px',
-  padding: '16px',
+  padding: '14px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-around',
 };
 
-const helpText: React.CSSProperties = {
-  fontSize: '12px',
-  color: '#aaa',
-  lineHeight: '1.6',
+const circleControlBtnStyle = (active: boolean, activeColor: string): React.CSSProperties => ({
+  width: '42px',
+  height: '42px',
+  borderRadius: '50%',
+  border: 'none',
+  background: active ? 'rgba(255, 82, 82, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  transition: 'all 0.15s ease',
+});
+
+const exitBtnStyle: React.CSSProperties = {
+  width: '42px',
+  height: '42px',
+  borderRadius: '50%',
+  border: 'none',
+  background: 'rgba(255, 82, 82, 0.15)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  transition: 'all 0.15s ease',
 };

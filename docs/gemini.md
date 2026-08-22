@@ -25,12 +25,11 @@ A real-time collaborative web platform where users can join a room, be randomly 
 
 To ensure the music remains cohesive and the UI doesn't become cluttered, rooms will be optimized for a "Band" sweet spot of **4 to 6 players**. 
 
-Available instruments for random assignment:
-1.  **Drums / Beatbox:** A grid-based drum pad.
-2.  **Bass Synth:** Monophonic, heavy low-end.
-3.  **Lead Keyboard:** Polyphonic, bright sound for melodies.
-4.  **Pad / Chords:** Atmospheric, sustained sounds.
-5.  **FX / Percussion:** Sound effects or auxiliary rhythm.
+Available instruments for random assignment & custom instrument UI designs:
+1. **Piano / Keyboard:** SoundTrap-inspired two-octave (C3 to C5) clean keyboard surface with dark sharp accidentals (`S`, `D`, `G`, `H`, `J`, `L`, `1`, `3`, `4`, `5`, `7`, `8`) and white natural keys (`Z` through `I`).
+2. **Guitar / Chords:** SoundTrap-inspired acoustic wood fretboard and 8-chord matrix (`C Maj`, `G Maj`, `A Min`, `F Maj`, `E Min`, `D Min`, `E Maj`, `D Maj`). Features 6 string lanes (`E`, `B`, `G`, `D`, `A`, `E`), cream note blocks, and realistic multi-note strumming audio synthesis.
+3. **Drums / Freedrum Kit:** Freedrum-inspired concentric double-ring circular pad arc (`Kick`, `Snare`, `Closed Hi-Hat`, `Rack Toms`, `Crash Cymbal`, `Hand Clap`, `Cowbell`) with vibrant neon ring borders and hotkey badges (`A`-`K`).
+4. **Frameless Studio Integration:** Unified dark studio aesthetic (`#7C4DFF` accent palette), removing OP-1 retro chassis, knobs, and title headers so instruments integrate seamlessly directly into the jam stage grid.
 
 ## 3. Latency Management Strategy
 

@@ -58,6 +58,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
           <div>
             <label style={labelStyle}>YOUR STAGE NAME</label>
             <input
+              suppressHydrationWarning
               type="text"
               placeholder="e.g. Jimi, Miles, or Daft Punk"
               value={userName}
@@ -70,11 +71,12 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label style={labelStyle}>ROOM ID</label>
-              <button type="button" onClick={generateRandomRoom} style={randomBtnStyle}>
+              <button suppressHydrationWarning type="button" onClick={generateRandomRoom} style={randomBtnStyle}>
                 <Dices size={12} style={{ marginRight: '4px' }} /> Randomize
               </button>
             </div>
             <input
+              suppressHydrationWarning
               type="text"
               placeholder="e.g. jazz-cafe-123"
               value={roomId}
@@ -107,7 +109,7 @@ export default function Lobby({ onJoin, isLoading = false }: LobbyProps) {
             </div>
           </div>
 
-          <button type="submit" disabled={isLoading} style={joinBtnStyle}>
+          <button suppressHydrationWarning type="submit" disabled={isLoading} style={joinBtnStyle}>
             {isLoading ? (
               <span>Connecting to Stage...</span>
             ) : (

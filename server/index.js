@@ -16,11 +16,10 @@ const io = new Server(server, {
 });
 
 const ALL_INSTRUMENTS = [
-  { id: 'DRUMS', name: 'Drum Kit', color: '#FF5722', role: 'Rhythm & Beats' },
-  { id: 'BASS', name: 'Sub Bass', color: '#E040FB', role: 'Groove & Low End' },
-  { id: 'LEAD', name: 'Lead Synth', color: '#00E676', role: 'Melody & Solo' },
-  { id: 'PAD', name: 'Ambient Pad', color: '#00B0FF', role: 'Harmonies & Chords' },
-  { id: 'FX', name: 'FX & Glitch', color: '#FFD600', role: 'Textures & Drops' },
+  { id: 'DRUM', name: 'Drum Kit', color: '#FF5722', role: 'Rhythm & Beats' },
+  { id: 'GUITAR', name: 'Guitar', color: '#E040FB', role: 'Strumming & Chords' },
+  { id: 'KEYBOARD', name: 'Keyboard', color: '#00E676', role: 'Melody & Harmony' },
+  { id: 'TRUMPET', name: 'Trumpet', color: '#FFD600', role: 'Brass & Solo' },
 ];
 
 // Room state storage: roomId -> { id, bpm, isPlaying, users: { [socketId]: userObj } }

@@ -8,8 +8,8 @@ interface VideoGrid2x2Props {
   localUser: User | null;
   localStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
-  volumeLevels: Record<string, number>;
-  activeNotesByUser: Record<string, string[]>;
+  volumeLevels?: Record<string, number>;
+  activeNotesByUser?: Record<string, string[]>;
   onInvite?: () => void;
 }
 
@@ -18,15 +18,11 @@ function VideoSlot({
   user,
   isLocal,
   stream,
-  volume = 0,
-  activeNotes = [],
 }: {
   slotNumber: number;
   user: User;
   isLocal: boolean;
   stream?: MediaStream | null;
-  volume: number;
-  activeNotes: string[];
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -37,47 +33,21 @@ function VideoSlot({
   }, [stream]);
 
   const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled && !user.isVideoOff;
-  const isSpeaking = volume > 15;
 
   return (
-    <div
-      style={{
-        ...slotContainerStyle,
-        borderColor: isSpeaking
-          ? '#00E676'
-          : activeNotes.length > 0
-          ? user.instrument?.color || '#FF5722'
-          : 'rgba(255, 255, 255, 0.12)',
-        boxShadow: isSpeaking
-          ? '0 0 20px rgba(0, 230, 118, 0.35)'
-          : activeNotes.length > 0
-          ? `0 0 25px ${user.instrument?.color || '#FF5722'}66`
-          : 'none',
-      }}
-    >
-      {/* Header Bar matching ASCII */}
+    <div style={slotContainerStyle}>
+      {/* Header Bar */}
       <div style={slotHeaderStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={slotLabelStyle}>
-            VIDEO {slotNumber}: {isLocal ? `${user.userName} (YOU/Host)` : user.userName}
-          </span>
-        </div>
-
+        <span style={slotLabelStyle}>
+          Feed {slotNumber}: {user.userName} {isLocal ? '(YOU)' : ''}
+        </span>
         <div style={headerRightGroup}>
-          <span
-            style={{
-              ...instBadgeStyle,
-              borderColor: user.instrument?.color || '#00E676',
-              color: user.instrument?.color || '#00E676',
-              background: `${user.instrument?.color || '#00E676'}18`,
-            }}
-          >
-            [{user.instrument?.name?.toUpperCase() || 'MUSICIAN'}]
+          <span style={instBadgeStyle}>
+            {user.instrument?.name || 'Musician'}
           </span>
-
-          <div style={{ display: 'flex', gap: '4px', marginLeft: '6px' }}>
-            {user.isMuted ? <MicOff size={12} color="#FF5252" /> : <Mic size={12} color="#00E676" />}
-            {user.isVideoOff ? <VideoOff size={12} color="#FF5252" /> : <Video size={12} color="#00E676" />}
+          <div style={{ display: 'flex', gap: '6px', marginLeft: '8px' }}>
+            {user.isMuted ? <MicOff size={13} color="#FF5252" /> : <Mic size={13} color="#888" />}
+            {user.isVideoOff ? <VideoOff size={13} color="#FF5252" /> : <Video size={13} color="#888" />}
           </div>
         </div>
       </div>
@@ -94,38 +64,12 @@ function VideoSlot({
           />
         ) : (
           <div style={avatarFallbackStyle}>
-            <div
-              style={{
-                ...avatarCircle,
-                background: `linear-gradient(135deg, ${user.instrument?.color || '#333'} 0%, #101018 100%)`,
-              }}
-            >
-              <Music size={24} color="#fff" />
+            <div style={avatarCircle}>
+              <Music size={22} color="#888" />
             </div>
-            <span style={{ fontSize: '11px', color: '#777', marginTop: '6px' }}>Camera Disabled</span>
+            <span style={{ fontSize: '11px', color: '#666', marginTop: '6px' }}>Camera Off</span>
           </div>
         )}
-
-        {/* Live Active Note Pop */}
-        {activeNotes.length > 0 && (
-          <div style={activeNoteTag}>
-            <span>🎵 {activeNotes.join(', ')}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Real-time VU Meter Bar matching ASCII: "VU: ||||||||||||||||" */}
-      <div style={vuMeterRowStyle}>
-        <span style={vuLabelStyle}>VU:</span>
-        <div style={vuMeterTrack}>
-          <div
-            style={{
-              ...vuMeterBar,
-              width: `${Math.min(100, volume * 1.5)}%`,
-              background: volume > 60 ? '#FF5252' : volume > 30 ? '#FFD600' : '#00E676',
-            }}
-          />
-        </div>
       </div>
     </div>
   );
@@ -135,21 +79,17 @@ function EmptySlot({ slotNumber, onInvite }: { slotNumber: number; onInvite?: ()
   return (
     <div style={emptySlotContainer}>
       <div style={emptySlotHeader}>
-        <span style={slotLabelStyle}>VIDEO {slotNumber}: [OPEN SLOT]</span>
-        <span style={{ fontSize: '10px', color: '#666' }}>[OFFLINE]</span>
+        <span style={slotLabelStyle}>Feed {slotNumber}: Open Slot</span>
       </div>
 
       <div style={emptySlotBody}>
-        <UserPlus size={28} color="#444" />
-        <span style={{ fontSize: '12px', color: '#777', marginTop: '8px' }}>Waiting for bandmate...</span>
-        <button onClick={onInvite} style={inviteBtnStyle}>
-          Invite Musician
-        </button>
-      </div>
-
-      <div style={vuMeterRowStyle}>
-        <span style={vuLabelStyle}>VU:</span>
-        <div style={vuMeterTrack} />
+        <UserPlus size={24} color="#555" />
+        <span style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>Waiting for musician...</span>
+        {onInvite && (
+          <button onClick={onInvite} style={inviteBtnStyle}>
+            Invite
+          </button>
+        )}
       </div>
     </div>
   );
@@ -160,11 +100,8 @@ export default function VideoGrid2x2({
   localUser,
   localStream,
   remoteStreams,
-  volumeLevels,
-  activeNotesByUser,
   onInvite,
 }: VideoGrid2x2Props) {
-  // Construct 4 slots (local user is always slot 1, peers occupy 2, 3, 4)
   const slots: (User | null)[] = [localUser, null, null, null];
 
   const remoteUsers = users.filter((u) => u.socketId !== localUser?.socketId);
@@ -182,8 +119,6 @@ export default function VideoGrid2x2({
 
         const isLocal = user.socketId === localUser?.socketId;
         const stream = isLocal ? localStream : remoteStreams.get(user.socketId);
-        const volume = volumeLevels[user.socketId] || 0;
-        const activeNotes = activeNotesByUser[user.socketId] || [];
 
         return (
           <VideoSlot
@@ -192,8 +127,6 @@ export default function VideoGrid2x2({
             user={user}
             isLocal={isLocal}
             stream={stream}
-            volume={volume}
-            activeNotes={activeNotes}
           />
         );
       })}
@@ -214,12 +147,10 @@ const grid2x2Container: React.CSSProperties = {
 const slotContainerStyle: React.CSSProperties = {
   background: '#12121c',
   borderRadius: '12px',
-  borderWidth: '1px',
-  borderStyle: 'solid',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
-  transition: 'all 0.12s ease',
 };
 
 const slotHeaderStyle: React.CSSProperties = {
