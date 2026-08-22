@@ -119,34 +119,45 @@ export default function JamRoomPage() {
       const audioSources: MediaStream[] = [];
       if (localStream) audioSources.push(localStream);
 
-      const stageDimensions = (() => {
-        if (typeof window !== 'undefined') {
-          const el = document.querySelector('[data-bubble-stage]') as HTMLElement;
-          return el ? { width: el.offsetWidth, height: el.offsetHeight } : { width: 1280, height: 720 };
+      // Add remote peer audio streams
+      remoteStreams.forEach((stream) => {
+        if (stream && stream.getAudioTracks().length > 0) {
+          audioSources.push(stream);
         }
-        return { width: 1280, height: 720 };
-      })();
+      });
+
+      // Add Tone.js Synthesizer Master Audio
+      const synthStream = audioEngine.getRecorderStream();
+      if (synthStream) audioSources.push(synthStream);
 
       const started = videoSessionRecorder.start(() => {
         const allUsers = localUser ? (users.length > 0 ? users : [localUser]) : [];
+        const stageEl = document.querySelector('[data-bubble-stage]') as HTMLElement;
+        const stageRect = stageEl?.getBoundingClientRect() || { width: 1280, height: 720, left: 0, top: 0 };
+
         return {
           roomId,
-          stageDimensions,
+          stageDimensions: { width: stageRect.width || 1280, height: stageRect.height || 720 },
           participants: allUsers.map((u) => {
             const isLocal = u.socketId === localUser?.socketId;
-            const stream = isLocal ? localStream : remoteStreams.get(u.socketId);
-            const videoEl = stream ? (() => {
-              const v = document.createElement('video');
-              v.srcObject = stream;
-              v.muted = true;
-              v.play().catch(() => {});
-              return v;
-            })() : null;
+            const bubbleEl = document.querySelector(`[data-socket-id="${u.socketId}"]`) as HTMLElement;
+            const videoEl = document.querySelector(`[data-socket-id="${u.socketId}"] video`) as HTMLVideoElement;
+
+            let pos = { x: 640, y: 360, radius: 110 };
+            if (bubbleEl && stageEl) {
+              const bRect = bubbleEl.getBoundingClientRect();
+              pos = {
+                x: bRect.left - stageRect.left + bRect.width / 2,
+                y: bRect.top - stageRect.top + bRect.height / 2,
+                radius: bRect.width / 2,
+              };
+            }
+
             return {
               user: u,
               isLocal,
-              videoElement: videoEl,
-              pos: { x: 640, y: 360, radius: 120 },
+              videoElement: videoEl || null,
+              pos,
               volume: volumeLevels[u.socketId] || 0,
               activeNotes: activeNotesByUser[u.socketId] || [],
             };
@@ -162,7 +173,7 @@ export default function JamRoomPage() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `jamsham-live-video-${Date.now()}.webm`;
+        a.download = `jamsham-live-session-${Date.now()}.webm`;
         a.click();
         URL.revokeObjectURL(url);
       }

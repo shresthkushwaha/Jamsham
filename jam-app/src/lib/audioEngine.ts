@@ -345,6 +345,10 @@ class AudioEngine {
     });
   }
 
+  public getRecorderStream(): MediaStream | null {
+    return this.recorderDestination?.stream || null;
+  }
+
   public isRecording(): boolean {
     return this.isRecordingSession;
   }
