@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User } from '@/lib/webrtcManager';
 import { useParticipantEnergy } from '@/lib/useParticipantEnergy';
 
@@ -56,12 +56,13 @@ export default function PlayerOrb({
 }: PlayerOrbProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [hasLiveVideo, setHasLiveVideo] = useState(false);
 
   const instKey = (user.instrument?.id || user.instrument?.name || 'PIANO').toUpperCase();
   const baseColor = roleColor || INSTRUMENT_COLORS[instKey] || user.instrument?.color || '#9C27B0';
   const iconEmoji = INSTRUMENT_ICONS[instKey] || '🎵';
 
-  // Dynamic Sizing driven by note density & voice volume
+  // Sizing driven by note energy and mic volume
   const { energy, isHittingNote } = useParticipantEnergy(activeNotes, {
     minSize: defaultSize ? defaultSize * 0.8 : 150,
     maxSize: defaultSize ? defaultSize * 1.3 : 340,
@@ -69,43 +70,48 @@ export default function PlayerOrb({
   });
 
   const displaySize = defaultSize ? Math.round(defaultSize) : 220;
-  const [trackVersion, setTrackVersion] = React.useState(0);
 
-  useEffect(() => {
-    if (!stream) return;
-    const handleTrackChange = () => setTrackVersion((v) => v + 1);
-
-    stream.addEventListener('addtrack', handleTrackChange);
-    stream.addEventListener('removetrack', handleTrackChange);
-    handleTrackChange();
-
-    return () => {
-      stream.removeEventListener('addtrack', handleTrackChange);
-      stream.removeEventListener('removetrack', handleTrackChange);
-    };
-  }, [stream]);
-
+  // Video and audio stream attachment
   useEffect(() => {
     if (stream) {
       if (videoRef.current) {
-        videoRef.current.srcObject = stream;
+        if (videoRef.current.srcObject !== stream) {
+          videoRef.current.srcObject = stream;
+        }
         videoRef.current.play().catch(() => {});
       }
-      // Guarantee remote microphone audio plays out of speakers
-      if (audioRef.current && !isLocal) {
-        audioRef.current.srcObject = stream;
-        audioRef.current.play().catch((err) => {
-          console.warn('[PlayerOrb] Audio play error:', err);
-        });
-      }
-    }
-  }, [stream, isLocal, trackVersion]);
 
-  const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks().some((t) => t.enabled) && !user.isVideoOff;
+      if (audioRef.current && !isLocal) {
+        if (audioRef.current.srcObject !== stream) {
+          audioRef.current.srcObject = stream;
+        }
+        audioRef.current.play().catch(() => {});
+      }
+
+      const checkVideo = () => {
+        const videoTracks = stream.getVideoTracks();
+        const active = videoTracks.length > 0 && videoTracks.some((t) => t.enabled && t.readyState === 'live') && !user.isVideoOff;
+        setHasLiveVideo(active);
+      };
+
+      checkVideo();
+      stream.addEventListener('addtrack', checkVideo);
+      stream.addEventListener('removetrack', checkVideo);
+
+      const interval = setInterval(checkVideo, 1000);
+      return () => {
+        clearInterval(interval);
+        stream.removeEventListener('addtrack', checkVideo);
+        stream.removeEventListener('removetrack', checkVideo);
+      };
+    } else {
+      setHasLiveVideo(false);
+    }
+  }, [stream, isLocal, user.isVideoOff]);
+
   const isSpeaking = volume > 8;
   const volNorm = Math.min(1, volume / 75);
 
-  // Outer glow intensity based on voice volume + note energy
   const glowSpread = 12 + volNorm * 40 + energy * 35;
   const glowBorderWidth = Math.max(3.5, 3.5 + volNorm * 4.5);
   const glowOpacity = Math.min(0.98, 0.45 + volNorm * 0.45 + energy * 0.45);
@@ -122,10 +128,10 @@ export default function PlayerOrb({
         justifyContent: 'center',
       }}
     >
-      {/* Dedicated Unmuted Audio Player for Remote Peer Microphone Voice */}
+      {/* Dedicated Audio Element for Peer Voice */}
       {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
 
-      {/* Concentric Speaking Soundwave Aura */}
+      {/* Speaking Soundwave Aura */}
       {isSpeaking && (
         <div
           style={{
@@ -177,31 +183,35 @@ export default function PlayerOrb({
           zIndex: 1,
         }}
       >
-        {/* Permanent Video Element in DOM to prevent track drops */}
+        {/* Always rendered Video Element so frames decode continuously */}
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={isLocal}
           style={{
+            position: 'absolute',
+            inset: 0,
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             transform: isLocal ? 'scaleX(-1)' : 'none',
-            display: hasVideo ? 'block' : 'none',
+            zIndex: 1,
           }}
         />
 
-        {!hasVideo && (
+        {/* Fallback Avatar Placeholder shown when camera is off/pending */}
+        {!hasLiveVideo && (
           <div
             style={{
+              position: 'absolute',
+              inset: 0,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              width: '100%',
-              height: '100%',
-              background: `radial-gradient(circle at center, ${baseColor}22 0%, #08080f 80%)`,
+              background: `radial-gradient(circle at center, ${baseColor}33 0%, #08080f 80%)`,
+              zIndex: 2,
             }}
           >
             <div
@@ -209,7 +219,7 @@ export default function PlayerOrb({
                 width: `${Math.max(48, displaySize * 0.38)}px`,
                 height: `${Math.max(48, displaySize * 0.38)}px`,
                 borderRadius: '50%',
-                backgroundColor: `${baseColor}33`,
+                backgroundColor: `${baseColor}44`,
                 border: `2px solid ${baseColor}`,
                 display: 'flex',
                 alignItems: 'center',
@@ -222,12 +232,14 @@ export default function PlayerOrb({
             >
               {user.userName ? user.userName.slice(0, 2).toUpperCase() : 'JM'}
             </div>
-            <span style={{ fontSize: '11px', color: '#888' }}>Camera Off</span>
+            <span style={{ fontSize: '11px', color: '#aaa', fontWeight: 500 }}>
+              {stream ? 'Connecting...' : 'Camera Off'}
+            </span>
           </div>
         )}
       </div>
 
-      {/* Floating Instrument Badge (Bottom Right) */}
+      {/* Floating Instrument Badge */}
       <div
         style={{
           position: 'absolute',
@@ -250,7 +262,7 @@ export default function PlayerOrb({
         {iconEmoji}
       </div>
 
-      {/* Floating Name & Host Crown Tag */}
+      {/* Floating Name & Host Crown */}
       <div
         style={{
           position: 'absolute',
