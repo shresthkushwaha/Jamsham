@@ -20,24 +20,37 @@ export default function Visualizer() {
       const height = canvas.height;
       ctx.clearRect(0, 0, width, height);
 
+      // CRT phosphor grid lines
+      ctx.strokeStyle = 'rgba(0, 230, 118, 0.08)';
+      ctx.lineWidth = 1;
+      for (let y = 10; y < height; y += 15) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
       const data = audioEngine.getAnalyserData();
-      const barCount = 32;
-      const barWidth = width / barCount - 2;
+      const barCount = 28;
+      const barWidth = width / barCount - 3;
 
       for (let i = 0; i < barCount; i++) {
-        // Map FFT values (usually negative dB from -100 to 0) to height
         const db = data[i] || -100;
-        const normalized = Math.max(0, (db + 100) / 100);
-        const barHeight = Math.max(4, normalized * height * 0.95);
+        const normalized = Math.max(0, (db + 95) / 95);
+        const barHeight = Math.max(3, normalized * height * 0.9);
 
-        // Smooth neon gradient
+        // Vintage CRT green/amber phosphor gradient
         const gradient = ctx.createLinearGradient(0, height, 0, height - barHeight);
-        gradient.addColorStop(0, '#00E676');
-        gradient.addColorStop(0.5, '#00B0FF');
-        gradient.addColorStop(1, '#E040FB');
+        gradient.addColorStop(0, '#00a352');
+        gradient.addColorStop(0.6, '#00E676');
+        gradient.addColorStop(1, '#ffd600');
 
         ctx.fillStyle = gradient;
-        ctx.fillRect(i * (barWidth + 2), height - barHeight, barWidth, barHeight);
+        ctx.fillRect(i * (barWidth + 3) + 4, height - barHeight - 4, barWidth, barHeight);
+
+        // Peak dot
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(i * (barWidth + 3) + 4, height - barHeight - 7, barWidth, 2);
       }
     };
 
@@ -49,39 +62,55 @@ export default function Visualizer() {
   }, []);
 
   return (
-    <div style={containerStyle}>
+    <div className="skeuo-rack-chassis" style={containerStyle}>
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 6, left: 6 }} />
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 6, right: 6 }} />
+
       <div style={headerStyle}>
-        <span style={{ fontSize: '13px', fontWeight: 600, color: '#aaa' }}>🎵 Room Master Spectrum</span>
-        <span style={{ fontSize: '11px', color: '#00E676' }}>● LIVE 60 FPS</span>
+        <div className="skeuo-dymo-tape" style={{ fontSize: '9px', padding: '2px 6px' }}>
+          <span>SPECTRUM ANALYZER</span>
+        </div>
+        <span className="skeuo-digital-led" style={{ fontSize: '9px', color: '#00E676' }}>
+          ● 60 FPS CRT
+        </span>
       </div>
-      <canvas ref={canvasRef} width={340} height={110} style={canvasStyle} />
+
+      <div style={screenCasing}>
+        <canvas ref={canvasRef} width={280} height={100} style={canvasStyle} />
+      </div>
     </div>
   );
 }
 
 const containerStyle: React.CSSProperties = {
-  background: 'rgba(18, 18, 26, 0.85)',
-  backdropFilter: 'blur(16px)',
-  borderRadius: '16px',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  padding: '16px',
+  padding: '12px 14px',
   display: 'flex',
   flexDirection: 'column',
   width: '100%',
-  maxWidth: '380px',
-  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+  position: 'relative',
 };
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginBottom: '10px',
+  marginBottom: '8px',
+  padding: '0 12px',
+};
+
+const screenCasing: React.CSSProperties = {
+  background: '#040d07',
+  border: '3px inset #0f2b18',
+  borderRadius: '8px',
+  padding: '4px',
+  boxShadow: 'inset 0 0 16px rgba(0, 230, 118, 0.25), 0 2px 4px rgba(0,0,0,0.8)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 const canvasStyle: React.CSSProperties = {
   width: '100%',
-  height: '110px',
-  borderRadius: '8px',
-  background: '#09090f',
+  height: '95px',
+  borderRadius: '4px',
 };

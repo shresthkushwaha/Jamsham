@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, X, Circle, Disc } from 'lucide-react';
+import { Copy, Check, X, Disc } from 'lucide-react';
 import { audioEngine } from '@/lib/audioEngine';
 
 interface RoomHeaderProps {
@@ -27,7 +27,7 @@ export default function RoomHeader({ roomId, userCount, bpm, onBpmChange, onLeav
     return () => clearInterval(timer);
   }, [bpm]);
 
-  // Recording Timer (Phase 5)
+  // Recording Timer
   useEffect(() => {
     let timer: any = null;
     if (isRecording) {
@@ -52,7 +52,6 @@ export default function RoomHeader({ roomId, userCount, bpm, onBpmChange, onLeav
       const audioBlob = await audioEngine.stopRecording();
       setIsRecording(false);
       if (audioBlob) {
-        // Trigger download of session recording
         const url = URL.createObjectURL(audioBlob);
         const a = document.createElement('a');
         a.style.display = 'none';
@@ -83,63 +82,92 @@ export default function RoomHeader({ roomId, userCount, bpm, onBpmChange, onLeav
   };
 
   return (
-    <header style={headerContainerStyle}>
+    <header className="skeuo-rack-chassis" style={headerContainerStyle}>
+      {/* Rack Corner Screws */}
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 8, left: 10 }} />
+      <span className="skeuo-screw" style={{ position: 'absolute', top: 8, right: 10 }} />
+
       {/* Center Group: Room ID, BPM, Recording */}
       <div style={centerGroupStyle}>
-        {/* Room Badge */}
-        <div style={roomBadgeStyle}>
-          <span style={{ color: '#888', fontSize: '11px' }}>ROOM:</span>
-          <span style={{ fontWeight: '800', color: '#fff', fontSize: '13px', letterSpacing: '0.5px' }}>
-            {roomId.toUpperCase()}
-          </span>
+        {/* Room Dymo Badge */}
+        <div className="skeuo-dymo-tape" style={{ padding: '4px 10px' }}>
+          <span style={{ color: '#888' }}>ROOM:</span>
+          <span style={{ color: '#00E676' }}>{roomId.toUpperCase()}</span>
           <button onClick={copyRoomLink} style={copyBtnStyle} title="Copy Invite Link">
-            {copied ? <Check size={12} color="#00E676" /> : <Copy size={12} color="#888" />}
+            {copied ? <Check size={12} color="#00E676" /> : <Copy size={12} color="#aaa" />}
           </button>
         </div>
 
-        {/* BPM Metronome */}
-        <div style={bpmBadgeStyle}>
-          <span style={{ color: '#888', fontSize: '11px' }}>BPM:</span>
-          <button onClick={() => onBpmChange(Math.max(60, bpm - 5))} style={stepBtn}>-</button>
-          <span style={{ fontWeight: 'bold', color: '#00E676', minWidth: '32px', textAlign: 'center', fontSize: '13px' }}>
-            {bpm}
+        {/* 7-Segment LED BPM Metronome */}
+        <div style={bpmModuleStyle}>
+          <span style={{ fontSize: '9px', fontWeight: 'bold', color: '#888', letterSpacing: '0.5px' }}>
+            MASTER CLOCK
           </span>
-          <button onClick={() => onBpmChange(Math.min(200, bpm + 5))} style={stepBtn}>+</button>
-          <div style={ledGroupStyle}>
-            {[0, 1, 2, 3].map((s) => (
-              <div
-                key={s}
-                style={{
-                  ...ledDot,
-                  background: metronomeBeat === s ? (s === 0 ? '#FF5252' : '#00E676') : 'rgba(255, 255, 255, 0.1)',
-                  boxShadow: metronomeBeat === s ? '0 0 8px #00E676' : 'none',
-                }}
-              />
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={() => onBpmChange(Math.max(60, bpm - 5))}
+              className="skeuo-industrial-btn"
+              style={stepBtn}
+            >
+              -
+            </button>
+            <div className="skeuo-digital-led" style={{ color: '#00E676', fontSize: '13px' }}>
+              {bpm} <span style={{ fontSize: '9px', color: '#777' }}>BPM</span>
+            </div>
+            <button
+              onClick={() => onBpmChange(Math.min(200, bpm + 5))}
+              className="skeuo-industrial-btn"
+              style={stepBtn}
+            >
+              +
+            </button>
+            <div style={ledGroupStyle}>
+              {[0, 1, 2, 3].map((s) => (
+                <div
+                  key={s}
+                  style={{
+                    ...ledDot,
+                    background: metronomeBeat === s ? (s === 0 ? '#FF5252' : '#00E676') : '#1b1b24',
+                    boxShadow: metronomeBeat === s ? '0 0 10px #00E676' : 'none',
+                  }}
+                />
+              ))}
+            </div>
           </div>
-          <span style={{ fontSize: '10px', color: '#888' }}>(Synced)</span>
         </div>
 
-        {/* Recording Action & Timer (Phase 5) */}
+        {/* Reel-to-Reel Tape Recording Unit */}
         <button
           onClick={handleToggleRecord}
+          className="skeuo-industrial-btn"
           style={{
             ...recBtnStyle,
             borderColor: isRecording ? '#FF5252' : 'rgba(255, 255, 255, 0.15)',
-            background: isRecording ? 'rgba(255, 82, 82, 0.2)' : 'rgba(0, 0, 0, 0.4)',
+            background: isRecording
+              ? 'linear-gradient(180deg, #3d1414 0%, #200a0a 100%)'
+              : 'linear-gradient(180deg, #242430 0%, #15151e 100%)',
           }}
-          title={isRecording ? 'Click to Stop & Download Session' : 'Click to Record Session Audio'}
+          title={isRecording ? 'Stop & Download Session' : 'Record Session'}
         >
-          <Disc size={14} color={isRecording ? '#FF5252' : '#aaa'} style={isRecording ? { animation: 'spin 2s linear infinite' } : {}} />
-          <span style={{ fontSize: '12px', fontWeight: 'bold', color: isRecording ? '#FF5252' : '#eee' }}>
-            REC: [ {isRecording ? formatTime(recordSeconds) : '00:00'} ] {isRecording ? '(REC 🔴)' : '(OFF)'}
-          </span>
+          <Disc
+            size={16}
+            color={isRecording ? '#FF5252' : '#888'}
+            style={isRecording ? { animation: 'spin 2s linear infinite' } : {}}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '8px', fontWeight: 900, color: isRecording ? '#FF5252' : '#888' }}>
+              TAPE DECK {isRecording ? '● REC' : 'READY'}
+            </span>
+            <span className="skeuo-digital-led" style={{ fontSize: '11px', color: isRecording ? '#FF5252' : '#aaa' }}>
+              {isRecording ? formatTime(recordSeconds) : '00:00'}
+            </span>
+          </div>
         </button>
       </div>
 
       {/* Right: Exit Button [X] */}
-      <button onClick={onLeave} style={exitBtnStyle} title="Exit Room [X]">
-        <X size={16} color="#aaa" />
+      <button onClick={onLeave} className="skeuo-industrial-btn" style={exitBtnStyle} title="Exit Stage [X]">
+        <X size={15} color="#aaa" />
       </button>
     </header>
   );
@@ -149,74 +177,61 @@ const headerContainerStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  padding: '8px 16px',
-  background: '#0d0d14',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-  height: '52px',
+  padding: '6px 24px',
+  height: '56px',
   boxSizing: 'border-box',
+  margin: '8px 8px 0 8px',
 };
 
 const centerGroupStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: '16px',
+  gap: '18px',
   flex: 1,
   justifyContent: 'center',
-};
-
-const roomBadgeStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  background: 'rgba(255, 255, 255, 0.04)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  padding: '5px 12px',
-  borderRadius: '8px',
 };
 
 const copyBtnStyle: React.CSSProperties = {
   background: 'none',
   border: 'none',
   cursor: 'pointer',
-  padding: '2px',
+  padding: '1px',
   display: 'flex',
   alignItems: 'center',
+  marginLeft: '4px',
 };
 
-const bpmBadgeStyle: React.CSSProperties = {
+const bpmModuleStyle: React.CSSProperties = {
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
-  gap: '6px',
-  background: 'rgba(255, 255, 255, 0.04)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  padding: '5px 12px',
-  borderRadius: '8px',
+  gap: '2px',
 };
 
 const stepBtn: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.1)',
-  border: 'none',
+  width: '20px',
+  height: '20px',
+  fontSize: '11px',
+  fontWeight: 'bold',
   color: '#fff',
-  width: '18px',
-  height: '18px',
-  borderRadius: '4px',
-  cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: '11px',
-  fontWeight: 'bold',
 };
 
 const ledGroupStyle: React.CSSProperties = {
   display: 'flex',
   gap: '4px',
   marginLeft: '4px',
+  background: '#07070a',
+  padding: '3px 6px',
+  borderRadius: '4px',
+  border: '1px solid #1a1a24',
 };
 
 const ledDot: React.CSSProperties = {
-  width: '6px',
-  height: '6px',
+  width: '7px',
+  height: '7px',
   borderRadius: '50%',
   transition: 'all 0.08s ease',
 };
@@ -225,22 +240,13 @@ const recBtnStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: '8px',
-  padding: '5px 14px',
-  borderRadius: '8px',
-  border: '1px solid',
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
+  padding: '4px 12px',
 };
 
 const exitBtnStyle: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.06)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '8px',
   width: '32px',
   height: '32px',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  cursor: 'pointer',
-  transition: 'all 0.15s ease',
 };

@@ -1,0 +1,16 @@
+{
+  "name": "jamsham",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "jam-app",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=jam-app",
+    "build": "npm run build --workspace=jam-app",
+    "start": "npm run start --workspace=jam-app",
+    "server": "npm start --workspace=server",
+    "dev:server": "npm run dev --workspace=server"
+  }
+}
